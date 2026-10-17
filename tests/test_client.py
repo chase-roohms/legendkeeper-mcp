@@ -193,3 +193,24 @@ def test_project_paths_are_quoted():
     client = LegendKeeperClient("k")
     api = ProjectClient(client, "proj/1")
     assert api.path("resources", "a b", "docs") == "/api/v3/projects/proj%2F1/resources/a%20b/docs"
+
+
+async def test_api_paths_get_trailing_slash_and_redirects_are_followed():
+    rec = Recorder(
+        httpx.Response(308, headers={"location": "/api/v3/projects/x/tags/"}),
+        httpx.Response(200, json={"data": []}),
+        httpx.Response(200, json={"ok": 1}),
+    )
+    client, _ = make(rec)
+    assert await client.request("GET", "/api/v3/projects/x/tags") == {"data": []}
+    assert rec.requests[0].url.path == "/api/v3/projects/x/tags/"
+    assert rec.requests[1].headers["authorization"] == "Bearer lk_secret"
+    await client.request("GET", "/api/v3/projects/x/")
+    assert rec.requests[2].url.path == "/api/v3/projects/x/"
+
+
+async def test_non_json_success_is_an_error():
+    rec = Recorder(httpx.Response(200, text="<html>login</html>", headers={"content-type": "text/html"}))
+    client, _ = make(rec)
+    with pytest.raises(LegendKeeperError, match="instead of JSON"):
+        await client.request("GET", "/api/v3/projects")

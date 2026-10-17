@@ -60,6 +60,9 @@ def main(argv: Sequence[str] | None = None) -> None:
         stream=sys.stderr,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
+    if settings.log_level != "DEBUG":
+        # httpx logs every request at INFO; keep stderr readable unless debugging.
+        logging.getLogger("httpx").setLevel(logging.WARNING)
     try:
         if args.command == "check":
             raise SystemExit(asyncio.run(check(settings)))

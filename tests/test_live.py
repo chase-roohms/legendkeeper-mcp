@@ -16,6 +16,7 @@ import struct
 import time
 import zlib
 from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 import pytest
@@ -58,8 +59,8 @@ def tiny_png(width: int = 64, height: int = 32) -> bytes:
     )
 
 
-@pytest.fixture
-async def client() -> AsyncIterator[Client]:
+@asynccontextmanager
+async def live_client() -> AsyncIterator[Client]:
     settings = Settings.from_env()
     server, registry = create_server(settings)
     try:
@@ -69,7 +70,12 @@ async def client() -> AsyncIterator[Client]:
         await registry.aclose()
 
 
-async def test_read_tools(client: Client) -> None:
+async def test_read_tools() -> None:
+    async with live_client() as client:
+        await _read_tools(client)
+
+
+async def _read_tools(client: Client) -> None:
     projects = json.loads(await call(client, "list_projects"))
     assert projects["projects"][0].get("projectId"), projects
     tree = await call(client, "browse_tree", depth=1)
@@ -81,7 +87,12 @@ async def test_read_tools(client: Client) -> None:
 
 
 @pytest.mark.skipif(not WRITE, reason="set LEGENDKEEPER_LIVE_WRITE=1 to run write tests")
-async def test_full_write_cycle(client: Client, tmp_path: Path) -> None:
+async def test_full_write_cycle(tmp_path: Path) -> None:
+    async with live_client() as client:
+        await _write_cycle(client, tmp_path)
+
+
+async def _write_cycle(client: Client, tmp_path: Path) -> None:
     name = f"[mcp-test] {time.strftime('%Y-%m-%d %H:%M:%S')}"
     created = json.loads(
         await call(

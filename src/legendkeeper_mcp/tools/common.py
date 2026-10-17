@@ -95,6 +95,12 @@ def dump(obj: Any) -> str:
     return json.dumps(obj, indent=2, ensure_ascii=False, default=str)
 
 
+def brief(obj: Any, keys: tuple[str, ...]) -> str:
+    """Single-line JSON with only the fields an assistant needs after a write."""
+    data = obj if isinstance(obj, dict) else {}
+    return json.dumps({k: data[k] for k in keys if data.get(k) not in (None, [], {})}, ensure_ascii=False)
+
+
 def compact(d: dict[str, Any]) -> dict[str, Any]:
     """Drop ``None`` values (so optional tool arguments are not sent to the API)."""
     return {k: v for k, v in d.items() if v is not None}

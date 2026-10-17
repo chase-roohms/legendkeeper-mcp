@@ -68,7 +68,9 @@ class LegendKeeperClient:
                 "Accept": "application/json",
                 "User-Agent": f"legendkeeper-mcp/{__version__} (+https://github.com/chase-roohms/legendkeeper-mcp)",
             },
-            follow_redirects=False,
+            # LegendKeeper redirects paths without a trailing slash (308). We add the slash ourselves; following
+            # redirects is only a safety net (httpx drops the Authorization header on cross-origin redirects).
+            follow_redirects=True,
         )
         # Uploads go to a signed storage URL and must not carry the API key.
         self._upload_http = httpx.AsyncClient(timeout=httpx.Timeout(max(timeout, 120.0)), transport=transport)
@@ -89,6 +91,7 @@ class LegendKeeperClient:
     ) -> Any:
         """Send a request and return the decoded JSON body (``None`` for 204)."""
         method = method.upper()
+        path = with_trailing_slash(path)
         headers = {"Authorization": f"Bearer {self._api_key}"}
         if if_match:
             headers["If-Match"] = if_match
@@ -118,13 +121,15 @@ class LegendKeeperClient:
                 ) from exc
 
             self._track_rate_limit(response)
-            if response.status_code < 400:
+            if response.status_code < 300:
                 if response.status_code == 204 or not response.content:
                     return None
                 try:
                     return response.json()
                 except ValueError:
-                    return response.text
+                    raise _unexpected(response) from None
+            if response.status_code < 400:
+                raise _unexpected(response)
 
             error = _to_error(response)
             if response.status_code in _RETRY_STATUSES and attempt < self._max_retries:
@@ -245,6 +250,22 @@ class ProjectClient:
         self, *parts: str, params: dict[str, Any] | None = None, max_items: int | None = None
     ) -> list[Any]:
         return await self.http.paginate(self.path(*parts), params, max_items=max_items)
+
+
+def with_trailing_slash(path: str) -> str:
+    if path.startswith(API_PREFIX) and not path.endswith("/"):
+        return path + "/"
+    return path
+
+
+def _unexpected(response: httpx.Response) -> LegendKeeperError:
+    kind = response.headers.get("content-type", "unknown content type")
+    return LegendKeeperError(
+        response.status_code,
+        "UNEXPECTED_RESPONSE",
+        f"LegendKeeper answered {response.status_code} with {kind} instead of JSON "
+        f"({response.text[:200].strip() or 'empty body'}). Check LEGENDKEEPER_BASE_URL.",
+    )
 
 
 def _param(value: Any) -> Any:

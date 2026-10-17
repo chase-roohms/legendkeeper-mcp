@@ -312,7 +312,13 @@ class FakeLegendKeeper:
 
         body = json.loads(request.content) if request.content else None
         headers = {k.lower(): v for k, v in request.headers.items()}
-        record = Recorded(request.method, url.path, dict(url.params), body, headers)
+        if not url.path.endswith("/"):
+            # Like the real API: paths without a trailing slash are redirected.
+            self.contract_errors.append(
+                f"{request.method} {url.path} lacks the trailing slash (308 redirect)"
+            )
+        path = url.path.rstrip("/") or "/"
+        record = Recorded(request.method, path, dict(url.params), body, headers)
         self.requests.append(record)
         if self.before_handle:
             self.before_handle(record)
@@ -320,14 +326,14 @@ class FakeLegendKeeper:
         if headers.get("authorization") != f"Bearer {self.api_key}":
             return self._error(ApiError(401, "UNAUTHENTICATED", "bad key"))
         if request.method == "POST" and not headers.get("idempotency-key"):
-            self.contract_errors.append(f"POST {url.path} without Idempotency-Key")
+            self.contract_errors.append(f"POST {path} without Idempotency-Key")
 
         op = None
         if self.validator is not None:
-            op = self.validator.find(request.method, url.path)
+            op = self.validator.find(request.method, path)
             if op is None:
                 self.contract_errors.append(
-                    f"{request.method} {url.path} is not an operation in the OpenAPI spec"
+                    f"{request.method} {path} is not an operation in the OpenAPI spec"
                 )
                 return self._error(ApiError(405, "METHOD_NOT_ALLOWED", "unknown route"))
             if op.request_pointer and body is not None:
@@ -337,12 +343,12 @@ class FakeLegendKeeper:
                     return self._error(ApiError(400, "VALIDATION_ERROR", "; ".join(problems)))
 
         for i, (method, pattern, error, extra_headers) in enumerate(self.queued_errors):
-            if method == request.method and re.search(pattern, url.path):
+            if method == request.method and re.search(pattern, path):
                 del self.queued_errors[i]
                 return self._error(error, extra_headers)
 
         try:
-            status, payload, extra = self._route(request.method, url.path, dict(url.params), body, headers)
+            status, payload, extra = self._route(request.method, path, dict(url.params), body, headers)
         except ApiError as exc:
             return self._error(exc)
 

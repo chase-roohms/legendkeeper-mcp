@@ -15,11 +15,24 @@ from .common import (
     ProjectArg,
     ResourceArg,
     ToolContext,
+    brief,
     compact,
-    dump,
 )
 from .common import require_confirm as _confirm
 
+EVENT_FIELDS = (
+    "id",
+    "laneId",
+    "type",
+    "name",
+    "formattedStart",
+    "formattedEnd",
+    "start",
+    "end",
+    "uri",
+    "color",
+    "isHidden",
+)
 HexColor = Annotated[str, Field(pattern=r"^#[0-9A-Fa-f]{6}$")]
 DateArg = Annotated[
     str | None,
@@ -125,7 +138,7 @@ def register(t: ToolContext) -> None:
         )
         created = await api.post("resources", rid, "docs", doc["id"], "events", json=body)
         when = created.get("formattedStart") or created.get("start")
-        return f"{note}Created event '{created.get('name')}' (id {created.get('id')}) at {when}.\n{dump(created)}"
+        return f"{note}Created event '{created.get('name')}' (id {created.get('id')}) at {when}.\n{brief(created, EVENT_FIELDS)}"
 
     @t.tool(annotations=UPDATE, write=True)
     async def update_timeline_event(
@@ -166,7 +179,8 @@ def register(t: ToolContext) -> None:
         )
         if not body:
             raise InputError("Nothing to update.")
-        return dump(await api.patch("resources", rid, "docs", doc["id"], "events", event_id, json=body))
+        updated = await api.patch("resources", rid, "docs", doc["id"], "events", event_id, json=body)
+        return brief(updated, EVENT_FIELDS)
 
     @t.tool(annotations=DESTRUCTIVE, write=True)
     async def delete_timeline_event(
@@ -200,4 +214,5 @@ def register(t: ToolContext) -> None:
         body: dict[str, Any] = {"name": name, "rank": rank_after(last), "size": size}
         if color:
             body["style"] = {"color": color}
-        return dump(await api.post("resources", rid, "docs", doc["id"], "lanes", json=body))
+        lane = await api.post("resources", rid, "docs", doc["id"], "lanes", json=body)
+        return brief(lane, ("id", "name", "rank", "size", "style"))

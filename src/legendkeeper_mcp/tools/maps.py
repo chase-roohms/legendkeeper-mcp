@@ -14,8 +14,8 @@ from .common import (
     ProjectArg,
     ResourceArg,
     ToolContext,
+    brief,
     compact,
-    dump,
 )
 from .common import require_confirm as _confirm
 
@@ -23,6 +23,22 @@ Point = Annotated[
     list[float], Field(min_length=2, max_length=2, description="[lat, lng] (or [x, y] in pixel mode)")
 ]
 IconShape = Literal["pin", "diamond", "flag", "marker", "shield", "circle", "banner", "arch", "none"]
+FEATURE_FIELDS = (
+    "id",
+    "type",
+    "name",
+    "pos",
+    "polygon",
+    "polygons",
+    "polyline",
+    "uri",
+    "iconGlyph",
+    "iconShape",
+    "iconColor",
+    "color",
+    "parentId",
+    "isHidden",
+)
 HexColor = Annotated[str, Field(pattern=r"^#[0-9A-Fa-f]{6}$")]
 
 
@@ -123,7 +139,7 @@ def register(t: ToolContext) -> None:
         )
         body.update(extra or {})
         created = await api.post("resources", rid, "docs", doc["id"], "features", json=body)
-        return dump(created)
+        return brief(created, FEATURE_FIELDS)
 
     @t.tool(annotations=UPDATE, write=True)
     async def update_map_feature(
@@ -169,7 +185,8 @@ def register(t: ToolContext) -> None:
         body.update(extra or {})
         if not body:
             raise InputError("Nothing to update.")
-        return dump(await api.patch("resources", rid, "docs", doc["id"], "features", feature_id, json=body))
+        updated = await api.patch("resources", rid, "docs", doc["id"], "features", feature_id, json=body)
+        return brief(updated, FEATURE_FIELDS)
 
     @t.tool(annotations=DESTRUCTIVE, write=True)
     async def delete_map_feature(

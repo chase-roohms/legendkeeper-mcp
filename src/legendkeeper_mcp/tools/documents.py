@@ -22,12 +22,14 @@ from .common import (
     ProjectArg,
     ResourceArg,
     ToolContext,
+    brief,
     compact,
     dump,
 )
 from .common import require_confirm as _confirm
 
 MAX_OUTPUT = 120_000
+DOC_FIELDS = ("id", "name", "type", "isHidden", "isFullWidth", "calendarId", "mapImage")
 
 
 def _clip(text: str) -> str:
@@ -155,7 +157,7 @@ def register(t: ToolContext) -> None:
             doc = await api.patch(
                 "resources", rid, "docs", doc["id"], json={"mapImage": {"assetId": map_image_asset_id}}
             )
-        return dump(doc)
+        return brief(doc, DOC_FIELDS)
 
     @t.tool(annotations=UPDATE, write=True)
     async def update_document(
@@ -186,7 +188,7 @@ def register(t: ToolContext) -> None:
         )
         if not body:
             raise InputError("Nothing to update.")
-        return dump(await api.patch("resources", rid, "docs", doc["id"], json=body))
+        return brief(await api.patch("resources", rid, "docs", doc["id"], json=body), DOC_FIELDS)
 
     @t.tool(annotations=DESTRUCTIVE, write=True)
     async def delete_document(
