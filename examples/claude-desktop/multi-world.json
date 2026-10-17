@@ -1,0 +1,20 @@
+{
+  "mcpServers": {
+    "legendkeeper": {
+      "command": "uvx",
+      "args": ["legendkeeper-mcp"],
+      "env": {
+        "LEGENDKEEPER_API_KEY_HOMEBREW": "lk_key_for_my_homebrew_world",
+        "LEGENDKEEPER_API_KEY_STRAHD": "lk_key_for_curse_of_strahd",
+        "LEGENDKEEPER_DEFAULT_PROJECT": "homebrew"
+      }
+    },
+    "legendkeeper-readonly": {
+      "command": "uvx",
+      "args": ["legendkeeper-mcp", "--read-only"],
+      "env": {
+        "LEGENDKEEPER_API_KEY": "lk_key_for_a_world_you_only_want_to_read"
+      }
+    }
+  }
+}

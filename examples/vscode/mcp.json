@@ -1,0 +1,20 @@
+{
+  "inputs": [
+    {
+      "type": "promptString",
+      "id": "legendkeeper-api-key",
+      "description": "LegendKeeper API key (Project Settings → Developers → API Keys)",
+      "password": true
+    }
+  ],
+  "servers": {
+    "legendkeeper": {
+      "type": "stdio",
+      "command": "docker",
+      "args": ["run", "-i", "--rm", "-e", "LEGENDKEEPER_API_KEY", "ghcr.io/chase-roohms/legendkeeper-mcp:latest"],
+      "env": {
+        "LEGENDKEEPER_API_KEY": "${input:legendkeeper-api-key}"
+      }
+    }
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "inputs": [
+    {
+      "type": "promptString",
+      "id": "legendkeeper-api-key",
+      "description": "LegendKeeper API key",
+      "password": true
+    }
+  ],
+  "servers": {
+    "legendkeeper": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": ["legendkeeper-mcp"],
+      "env": {
+        "LEGENDKEEPER_API_KEY": "${input:legendkeeper-api-key}"
+      }
+    }
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "legendkeeper": {
+      "command": "docker",
+      "args": [
+        "run", "-i", "--rm",
+        "-e", "LEGENDKEEPER_API_KEY",
+        "-v", "/absolute/path/to/your/images:/uploads:ro",
+        "ghcr.io/chase-roohms/legendkeeper-mcp:latest"
+      ],
+      "env": {
+        "LEGENDKEEPER_API_KEY": "lk_your_key_here"
+      }
+    }
+  }
+}

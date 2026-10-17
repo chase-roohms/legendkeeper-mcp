@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "legendkeeper": {
+      "command": "uvx",
+      "args": ["legendkeeper-mcp"],
+      "env": {
+        "LEGENDKEEPER_API_KEY": "lk_your_key_here"
+      }
+    }
+  }
+}

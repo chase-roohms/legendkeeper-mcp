@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "legendkeeper": {
+      "type": "http",
+      "url": "http://localhost:8000/mcp",
+      "headers": {
+        "Authorization": "Bearer the-value-of-MCP_AUTH_TOKEN"
+      }
+    }
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "inputs": [
+    {
+      "type": "promptString",
+      "id": "legendkeeper-mcp-token",
+      "description": "MCP_AUTH_TOKEN of your legendkeeper-mcp container",
+      "password": true
+    }
+  ],
+  "servers": {
+    "legendkeeper": {
+      "type": "http",
+      "url": "http://localhost:8000/mcp",
+      "headers": {
+        "Authorization": "Bearer ${input:legendkeeper-mcp-token}"
+      }
+    }
+  }
+}
