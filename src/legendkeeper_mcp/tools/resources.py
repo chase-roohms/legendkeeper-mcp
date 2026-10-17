@@ -255,7 +255,11 @@ def register(t: ToolContext) -> None:
                 banner["enabled"] = banner_enabled
             if banner_y_position is not None:
                 banner["yPosition"] = banner_y_position
-            body["banner"] = banner
+            if not banner.get("url"):
+                raise InputError("The resource has no banner yet; pass banner_url (an uploaded image URL).")
+            banner.setdefault("enabled", True)
+            banner.setdefault("yPosition", 50)
+            body["banner"] = {k: banner[k] for k in ("enabled", "url", "yPosition")}
         if not body:
             raise InputError("Nothing to update.")
         updated = await api.patch("resources", rid, json=body)
