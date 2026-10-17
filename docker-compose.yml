@@ -1,0 +1,23 @@
+# Long-running HTTP deployment: the MCP endpoint is http://localhost:8000/mcp
+# 1. cp .env.example .env and fill in LEGENDKEEPER_API_KEY and MCP_AUTH_TOKEN
+# 2. docker compose up -d
+services:
+  legendkeeper-mcp:
+    image: ghcr.io/chase-roohms/legendkeeper-mcp:latest
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      MCP_TRANSPORT: http
+      MCP_AUTH_TOKEN: ${MCP_AUTH_TOKEN:?Set MCP_AUTH_TOKEN in .env (e.g. openssl rand -hex 32)}
+    ports:
+      - "127.0.0.1:8000:8000" # only reachable from this machine
+    volumes:
+      - ./uploads:/uploads:ro # images you want the assistant to be able to upload
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL

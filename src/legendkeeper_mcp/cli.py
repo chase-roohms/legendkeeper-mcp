@@ -72,8 +72,11 @@ def main(argv: Sequence[str] | None = None) -> None:
 
 
 async def serve(settings: Settings) -> None:
+    from .http_app import check_http_security
     from .server import create_server
 
+    if settings.transport == "http":
+        check_http_security(settings)
     server, registry = create_server(settings)
     projects = ", ".join(f"{p.name} ({p.masked_key})" for p in settings.projects.values())
     logger.info(

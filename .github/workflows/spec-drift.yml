@@ -1,0 +1,34 @@
+name: API spec drift
+
+# Re-runs the suite against the *latest* LegendKeeper OpenAPI spec every week, so breaking API changes are
+# noticed even when this repository is quiet.
+on:
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    env:
+      LK_REQUIRE_SPEC: "1"
+      LEGENDKEEPER_REFRESH_SPEC: "1"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+      - run: uv sync --locked
+      - id: tests
+        run: uv run pytest -q
+      - name: Open an issue on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue list --label api-drift --state open --json number --jq 'length' | grep -qv '^0$' && exit 0
+          gh label create api-drift --color B60205 --description "LegendKeeper API spec changed" 2>/dev/null || true
+          gh issue create --label api-drift --title "LegendKeeper API spec drift detected" \
+            --body "The weekly run against the latest OpenAPI spec failed: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
