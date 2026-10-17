@@ -36,7 +36,7 @@ jobs:
       id-token: write # trusted publishing, no API token needed
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.3.0
       - run: uv build
       - run: uv publish --trusted-publishing always
 
@@ -89,7 +89,7 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.3.0
       - run: uv build
       - uses: softprops/action-gh-release@v3
         with:
