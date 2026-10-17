@@ -31,6 +31,8 @@ Block = dict[str, Any]
 KEEP = "__keep__"
 
 _MD = MarkdownIt("commonmark", {"html": True}).enable(["table", "strikethrough"])
+# Keep link URLs exactly as written (markdown-it would percent-encode them), so links round-trip unchanged.
+_MD.normalizeLink = lambda url: url  # type: ignore[method-assign]
 
 _KEEP_REGION_RE = re.compile(
     r"^[ \t]*<!--\s*lk:keep\b(?P<attrs>[^>]*?)-->[ \t]*\r?\n(?P<body>.*?)^[ \t]*<!--\s*/lk:keep\s*-->[ \t]*$",

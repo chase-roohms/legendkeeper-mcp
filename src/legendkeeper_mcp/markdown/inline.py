@@ -26,6 +26,7 @@ hard line break    ``{"break": true}``
 from __future__ import annotations
 
 import re
+import unicodedata
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from typing import Any
@@ -128,7 +129,15 @@ _ESCAPE_UNDERSCORE = re.compile(r"(?<![A-Za-z0-9])_|_(?![A-Za-z0-9])")
 _ESCAPE_TILDE = re.compile(r"~(?=~)")
 _ESCAPE_ENTITY = re.compile(r"&(?=#?[A-Za-z0-9]+;)")
 _LINE_START = re.compile(
-    r"^([ \t]*)(#{1,6}(?=\s|$)|>|[-+](?=\s|$)|(\d{1,9})([.)])(?=\s|$)|=+[ \t]*$|-{3,}|~~~)"
+    r"^([ \t]*)("
+    r"#{1,6}(?=[ \t]|$)"  # ATX heading
+    r"|>"  # block quote
+    r"|[-+*](?=[ \t]|$)"  # bullet list item (also "- - -" rules)
+    r"|(\d{1,9})([.)])(?=[ \t]|$)"  # ordered list item
+    r"|[-=][-= \t]*$"  # setext underline or dashed rule
+    r"|\|?[ \t]*:?-+:?[ \t]*\|"  # table delimiter row
+    r"|~~~"  # fence
+    r")"
 )
 
 
@@ -196,12 +205,12 @@ def _run_marks(run: Run) -> list[Mark]:
     return marks
 
 
-def _opener(mark: Mark) -> str:
+def _opener(mark: Mark, html: bool = False) -> str:
     kind = mark[0]
     if kind == "link":
         return "["
     if kind in _DELIMS:
-        return _DELIMS[kind]
+        return f"<{_HTML_FALLBACK[kind]}>" if html else _DELIMS[kind]
     if kind == "span":
         styles = []
         if mark[1]:
@@ -212,35 +221,84 @@ def _opener(mark: Mark) -> str:
     return f"<{_HTML_TAG[kind]}>"
 
 
-def _closer(mark: Mark) -> str:
+def _closer(mark: Mark, html: bool = False) -> str:
     kind = mark[0]
     if kind == "link":
         return f"]({_link_dest(mark[1])})"
     if kind in _DELIMS:
-        return _DELIMS[kind]
+        return f"</{_HTML_FALLBACK[kind]}>" if html else _DELIMS[kind]
     if kind == "span":
         return "</span>"
     return f"</{_HTML_TAG[kind]}>"
 
 
+_HTML_FALLBACK = {"bold": "strong", "italic": "em", "strike": "s"}
+_ASCII_PUNCT = set("!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~")
+
+
+def _category(ch: str | None) -> str:
+    """'b' boundary, 'w' whitespace, 'p' punctuation, 'o' other — CommonMark flanking classes."""
+    if ch is None:
+        return "b"
+    if ch.isspace():
+        return "w"
+    if ch in _ASCII_PUNCT or unicodedata.category(ch)[0] in ("P", "S"):
+        return "p"
+    return "o"
+
+
+def _unescaped_bang(text: str) -> bool:
+    if not text.endswith("!"):
+        return False
+    backslashes = len(text[:-1]) - len(text[:-1].rstrip("\\"))
+    return backslashes % 2 == 0
+
+
+@dataclass
+class _Tok:
+    kind: str  # "text" | "atom" | "open" | "close"
+    value: str = ""
+    mark: Mark | None = None
+    pair: int = -1
+
+
 @dataclass
 class _InlineWriter:
+    """Two-phase inline writer.
+
+    Phase 1 turns runs into text/atom/open/close tokens, moving whitespace outside of marks. Phase 2 picks, per
+    mark, Markdown delimiters (``**``, ``*``, ``~~``) when CommonMark's flanking rules let them parse at that spot
+    and the equivalent HTML tag (``<strong>``, ``<em>``, ``<s>``) otherwise.
+    """
+
     in_table: bool = False
     name_of: Callable[[str], str | None] | None = None
-    buf: str = ""
-    stack: list[tuple[Mark, int]] = field(default_factory=list)  # (mark, buffer position after opener)
+    toks: list[_Tok] = field(default_factory=list)
+    stack: list[tuple[Mark, int]] = field(default_factory=list)  # (mark, pair id)
+    pairs: int = 0
 
     def _close_top(self) -> None:
-        mark, pos = self.stack.pop()
-        opener = _opener(mark)
-        body = self.buf[pos:]
-        if not body.strip():
-            # Nothing visible inside the mark: drop the opener, keep any whitespace.
-            self.buf = self.buf[: pos - len(opener)] + body
-            return
-        stripped = body.rstrip(" \t")
-        trailing = body[len(stripped) :]
-        self.buf = self.buf[:pos] + stripped + _closer(mark) + trailing
+        mark, pair = self.stack.pop()
+        # Move trailing whitespace outside the mark.
+        trailing = ""
+        while (
+            self.toks
+            and self.toks[-1].kind == "text"
+            and self.toks[-1].value.rstrip(" \t") != self.toks[-1].value
+        ):
+            value = self.toks[-1].value
+            stripped = value.rstrip(" \t")
+            trailing = value[len(stripped) :] + trailing
+            if stripped:
+                self.toks[-1].value = stripped
+                break
+            self.toks.pop()
+        if self.toks and self.toks[-1].kind == "open" and self.toks[-1].pair == pair:
+            self.toks.pop()  # nothing visible inside: drop the mark
+        else:
+            self.toks.append(_Tok("close", mark=mark, pair=pair))
+        if trailing:
+            self.toks.append(_Tok("text", trailing))
 
     def _set_marks(self, marks: list[Mark], leading: str) -> None:
         current = [m for m, _ in self.stack]
@@ -249,20 +307,22 @@ class _InlineWriter:
             common += 1
         while len(self.stack) > common:
             self._close_top()
-        self.buf += leading
+        if leading:
+            self.toks.append(_Tok("text", leading))
         for mark in marks[common:]:
-            self.buf += _opener(mark)
-            self.stack.append((mark, len(self.buf)))
+            self.pairs += 1
+            self.toks.append(_Tok("open", mark=mark, pair=self.pairs))
+            self.stack.append((mark, self.pairs))
 
     def add(self, run: Run) -> None:
         if run.get("break"):
-            self.buf += "<br>" if self.in_table else "\\\n"
+            self.toks.append(_Tok("atom", "<br>" if self.in_table else "\\\n"))
             return
         if "mention" in run:
             marks = _run_marks({"color": run.get("color"), "highlight": run.get("highlight")})
             label = escape_text(mention_label(run["mention"], self.name_of), in_table=self.in_table)
             self._set_marks(marks, "")
-            self.buf += f"[{label}]({mention_uri(run['mention'])})"
+            self.toks.append(_Tok("atom", f"[{label}]({mention_uri(run['mention'])})"))
             return
         text = str(run.get("text", ""))
         if not text:
@@ -270,7 +330,7 @@ class _InlineWriter:
         if run.get("code"):
             self._set_marks([], "")
             span = _code_span(text.replace("\n", " "))
-            self.buf += span.replace("|", r"\|") if self.in_table else span
+            self.toks.append(_Tok("atom", span.replace("|", r"\|") if self.in_table else span))
             return
         marks = _run_marks(run)
         core = text.lstrip(" \t")
@@ -278,12 +338,69 @@ class _InlineWriter:
         escaped = escape_text(core, in_table=self.in_table)
         escaped = escaped.replace("\n", "<br>" if self.in_table else "\\\n")
         self._set_marks(marks, leading)
-        self.buf += escaped
+        if escaped:
+            self.toks.append(_Tok("text", escaped))
+
+    def _edge(self, index: int, step: int) -> str | None:
+        """The character next to token ``index`` in direction ``step`` (delimiters count as punctuation)."""
+        j = index + step
+        if j < 0 or j >= len(self.toks):
+            return None
+        tok = self.toks[j]
+        if tok.kind in ("open", "close"):
+            return "*"
+        if not tok.value:
+            return self._edge(j, step)
+        return tok.value[0] if step > 0 else tok.value[-1]
+
+    def _flanks(self, index: int, inner_step: int) -> bool:
+        # Conservative: Markdown delimiters only hug "ordinary" characters. Punctuation or other delimiters next to
+        # the inside of a mark make the run both-flanking (rule-of-3 territory), so those marks use HTML instead.
+        return _category(self._edge(index, inner_step)) == "o"
 
     def finish(self) -> str:
         while self.stack:
             self._close_top()
-        return self.buf
+        positions: dict[int, list[int]] = {}
+        for i, tok in enumerate(self.toks):
+            if tok.kind in ("open", "close"):
+                positions.setdefault(tok.pair, []).append(i)
+        html_pairs = set()
+        for pair, (open_i, close_i) in positions.items():
+            mark = self.toks[open_i].mark
+            if (
+                mark is not None
+                and mark[0] in _DELIMS
+                and not (self._flanks(open_i, +1) and self._flanks(close_i, -1))
+            ):
+                html_pairs.add(pair)
+        # A closing delimiter directly followed by an opening one of the same character (``**a***b*``) is
+        # ambiguous; render the opener as HTML.
+        for left, right in zip(self.toks, self.toks[1:], strict=False):
+            if (
+                left.kind == "close"
+                and right.kind == "open"
+                and left.mark is not None
+                and right.mark is not None
+                and left.mark[0] in _DELIMS
+                and right.mark[0] in _DELIMS
+                and left.pair not in html_pairs
+                and _DELIMS[left.mark[0]][0] == _DELIMS[right.mark[0]][0]
+            ):
+                html_pairs.add(right.pair)
+        out: list[str] = []
+        for tok in self.toks:
+            if tok.kind == "open" and tok.mark is not None:
+                piece = _opener(tok.mark, tok.pair in html_pairs)
+            elif tok.kind == "close" and tok.mark is not None:
+                piece = _closer(tok.mark, tok.pair in html_pairs)
+            else:
+                piece = tok.value
+            # "!" right before a link or mention would turn it into image syntax.
+            if piece.startswith("[") and out and _unescaped_bang(out[-1]):
+                out[-1] = out[-1][:-1] + "\\!"
+            out.append(piece)
+        return "".join(out)
 
 
 def runs_to_markdown(
@@ -293,12 +410,15 @@ def runs_to_markdown(
     name_of: Callable[[str], str | None] | None = None,
 ) -> str:
     writer = _InlineWriter(in_table=in_table, name_of=name_of)
-    for run in runs or ():
+    normalized = normalize_runs(list(runs or ()))
+    # Breaks at the edges of a paragraph cannot be expressed in Markdown (and LegendKeeper trims them too).
+    while normalized and (normalized[0].get("break") or str(normalized[0].get("text", "x")).strip() == ""):
+        normalized.pop(0)
+    while normalized and (normalized[-1].get("break") or str(normalized[-1].get("text", "x")).strip() == ""):
+        normalized.pop()
+    for run in normalized:
         writer.add(run)
     out = writer.finish()
-    # A trailing hard break renders as a stray backslash; drop it.
-    while out.endswith("\\\n"):
-        out = out[:-2]
     return out if in_table else escape_line_starts(out)
 
 

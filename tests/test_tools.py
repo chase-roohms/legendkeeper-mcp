@@ -118,7 +118,9 @@ async def test_read_page_as_markdown(make_client, fake):
         assert "Path: Locations" in text
         raw = json.loads(await call(client, "read_document", resource="Candy Kingdom", format="json"))
         assert raw["blocks"][0]["kind"] == "infobox"
-        assert "Founded long ago." in await call(client, "read_document", resource="Candy Kingdom", format="text")
+        assert "Founded long ago." in await call(
+            client, "read_document", resource="Candy Kingdom", format="text"
+        )
         js = await call(client, "read_document", resource="Candy Kingdom", opaque_blocks="json")
         assert "```lk-block" in js
 
@@ -161,7 +163,9 @@ async def test_write_page_append_with_mentions(make_client, fake):
 
 async def test_write_page_reports_unresolved_links(make_client):
     async with make_client() as client:
-        text = await call(client, "write_page", resource="Finn", mode="append", markdown="Meets [[Nobody Known]].")
+        text = await call(
+            client, "write_page", resource="Finn", mode="append", markdown="Meets [[Nobody Known]]."
+        )
         assert "Could not resolve wiki link [[Nobody Known]]" in text
 
 
@@ -203,7 +207,16 @@ async def test_write_page_sections(make_client, fake):
         assert "did not exist" in text
     blocks = page_blocks(fake, rid)
     kinds = [b["kind"] for b in blocks]
-    assert kinds == ["infobox", "heading", "paragraph", "heading", "paragraph", "bulletList", "heading", "paragraph"]
+    assert kinds == [
+        "infobox",
+        "heading",
+        "paragraph",
+        "heading",
+        "paragraph",
+        "bulletList",
+        "heading",
+        "paragraph",
+    ]
     assert blocks[2]["content"] == [{"text": "Rebuilt after the war."}]
     assert blocks[6]["content"] == [{"text": "Notable People"}]
 
@@ -232,7 +245,9 @@ async def test_write_page_lk_block_fence(make_client, fake):
     md = '```lk-block\n{"kind":"embed","provider":"youtube","url":"https://www.youtube.com/watch?v=dQw4w9WgXcQ"}\n```'
     async with make_client() as client:
         await call(client, "write_page", resource="Finn", mode="append", markdown=md)
-        bad = await call_error(client, "write_page", resource="Finn", mode="append", markdown="```lk-block\n{nope\n```")
+        bad = await call_error(
+            client, "write_page", resource="Finn", mode="append", markdown="```lk-block\n{nope\n```"
+        )
         assert "Invalid JSON" in bad
     assert page_blocks(fake, fake.ids["finn"])[-1]["kind"] == "embed"
 
@@ -288,7 +303,11 @@ async def test_update_resource_tags_and_banner(make_client, fake):
     finn = fake.resources[fake.ids["finn"]]
     assert finn["tags"] == ["NPC", "Hero"]
     assert finn["aliases"] == ["Finn the Human", "The Human"]
-    assert finn["banner"] == {"url": "https://assets.legendkeeper.test/b.png", "enabled": True, "yPosition": 50}
+    assert finn["banner"] == {
+        "url": "https://assets.legendkeeper.test/b.png",
+        "enabled": True,
+        "yPosition": 50,
+    }
 
 
 async def test_move_delete_restore(make_client, fake):
@@ -305,7 +324,9 @@ async def test_move_delete_restore(make_client, fake):
         text = await call(client, "delete_resource", resource="Locations", confirm=True, cascade=True)
         assert "2 descendant(s)" in text
         assert fake.resources[fake.ids["candy"]]["deleted"]
-        assert "Restored 'Locations'" in await call(client, "restore_resource", resource_id=fake.ids["locations"])
+        assert "Restored 'Locations'" in await call(
+            client, "restore_resource", resource_id=fake.ids["locations"]
+        )
 
 
 async def test_create_from_template(make_client, fake):
@@ -320,12 +341,20 @@ async def test_create_from_template(make_client, fake):
 
 async def test_document_lifecycle(make_client, fake):
     async with make_client() as client:
-        created = json.loads(await call(client, "create_document", resource="Finn", name="Notes", type="page"))
-        await call(client, "update_document", resource="Finn", document="Notes", name="GM Notes", is_hidden=True)
+        created = json.loads(
+            await call(client, "create_document", resource="Finn", name="Notes", type="page")
+        )
+        await call(
+            client, "update_document", resource="Finn", document="Notes", name="GM Notes", is_hidden=True
+        )
         assert fake.documents[created["id"]]["name"] == "GM Notes"
-        await call(client, "write_page", resource="Finn", document="GM Notes", mode="append", markdown="Secret stuff")
+        await call(
+            client, "write_page", resource="Finn", document="GM Notes", mode="append", markdown="Secret stuff"
+        )
         assert fake.documents[created["id"]]["blocks"][0]["content"] == [{"text": "Secret stuff"}]
-        assert "confirm=true" in await call_error(client, "delete_document", resource="Finn", document="GM Notes")
+        assert "confirm=true" in await call_error(
+            client, "delete_document", resource="Finn", document="GM Notes"
+        )
         await call(client, "delete_document", resource="Finn", document=created["id"], confirm=True)
         assert fake.documents[created["id"]]["deleted"]
 
@@ -383,7 +412,9 @@ async def test_map_features(make_client, fake):
         assert region["polygon"] == [[0, 0], [-5, 5], [-5, 0]]
         assert "at least 3" in await call_error(client, "create_map_feature", resource="World Map", name="Bad",
                                                 type="region", points=[[0, 0]])  # fmt: skip
-        await call(client, "update_map_feature", resource="World Map", feature_id=pin["id"], name="Tree House")
+        await call(
+            client, "update_map_feature", resource="World Map", feature_id=pin["id"], name="Tree House"
+        )
         assert doc["features"][pin["id"]]["name"] == "Tree House"
         await call(client, "delete_map_feature", resource="World Map", feature_id=pin["id"], confirm=True)
         assert pin["id"] not in doc["features"]
@@ -412,12 +443,16 @@ async def test_timeline_events_and_lanes(make_client, fake):
         await call(client, "create_timeline_lane", resource="History", name="Omens", color="#112233")
         await call(client, "delete_timeline_event", resource="History", event_id=event_id, confirm=True)
         assert event_id not in doc["events"]
-        assert "Pass `start`" in await call_error(client, "create_timeline_event", resource="History", name="x")
+        assert "Pass `start`" in await call_error(
+            client, "create_timeline_event", resource="History", name="x"
+        )
 
 
 async def test_timeline_on_new_document_creates_default_lane(make_client, fake):
     async with make_client() as client:
-        created = json.loads(await call(client, "create_resource", name="Calendar of Ooo", document_type="time"))
+        created = json.loads(
+            await call(client, "create_resource", name="Calendar of Ooo", document_type="time")
+        )
         await call(client, "create_timeline_event", resource=created["id"], name="Start", start="1")
     lanes = fake.doc_of(created["id"])["lanes"]
     assert [lane["name"] for lane in lanes.values()] == ["Events"]
@@ -450,10 +485,14 @@ async def test_upload_image_respects_upload_root(make_client, tmp_path: Path):
 async def test_upload_image_from_url(make_client, fake):
     fake.downloads["/dragon.png"] = PNG
     async with make_client() as client:
-        data = json.loads(await call(client, "upload_image", source="https://images.example/dragon.png", name="Dragon"))
+        data = json.loads(
+            await call(client, "upload_image", source="https://images.example/dragon.png", name="Dragon")
+        )
         assert data["name"] == "Dragon"
     async with make_client(LEGENDKEEPER_ALLOW_URL_UPLOADS="false") as client:
-        assert "disabled" in await call_error(client, "upload_image", source="https://images.example/dragon.png")
+        assert "disabled" in await call_error(
+            client, "upload_image", source="https://images.example/dragon.png"
+        )
 
 
 # ------------------------------------------------------------------------------------------ raw API
@@ -465,10 +504,18 @@ async def test_api_request(make_client, fake):
         assert "gregorian" in text
         text = await call(client, "api_request", method="GET", path=f"/api/v3/projects/{PROJECT_ID}/tags")
         assert "NPC" in text
-        assert "own project" in await call_error(client, "api_request", method="GET", path="/api/v3/projects/other/tags")
-        assert "Invalid path" in await call_error(client, "api_request", method="GET", path="/resources/../../x")
-        assert "confirm=true" in await call_error(client, "api_request", method="DELETE", path=f"/resources/{fake.ids['ice']}")
-        text = await call(client, "api_request", method="DELETE", path=f"/resources/{fake.ids['ice']}", confirm=True)
+        assert "own project" in await call_error(
+            client, "api_request", method="GET", path="/api/v3/projects/other/tags"
+        )
+        assert "Invalid path" in await call_error(
+            client, "api_request", method="GET", path="/resources/../../x"
+        )
+        assert "confirm=true" in await call_error(
+            client, "api_request", method="DELETE", path=f"/resources/{fake.ids['ice']}"
+        )
+        text = await call(
+            client, "api_request", method="DELETE", path=f"/resources/{fake.ids['ice']}", confirm=True
+        )
         assert text == "204 No Content"
 
 
@@ -489,7 +536,9 @@ async def test_bad_api_key(make_client):
 
 
 async def test_multiple_projects(make_client, fake):
-    async with make_client(LEGENDKEEPER_API_KEY_OTHER="lk_other", LEGENDKEEPER_DEFAULT_PROJECT="default") as client:
+    async with make_client(
+        LEGENDKEEPER_API_KEY_OTHER="lk_other", LEGENDKEEPER_DEFAULT_PROJECT="default"
+    ) as client:
         data = json.loads(await call(client, "list_projects"))
         names = {p["name"]: p for p in data["projects"]}
         assert set(names) == {"default", "other"}

@@ -64,13 +64,22 @@ class SpecValidator:
                 request = None
                 body = (op.get("requestBody") or {}).get("content", {}).get("application/json")
                 if body and "schema" in body:
-                    request = _pointer("paths", template, method, "requestBody", "content", "application/json", "schema")
+                    request = _pointer(
+                        "paths", template, method, "requestBody", "content", "application/json", "schema"
+                    )
                 responses = {}
                 for status, response in (op.get("responses") or {}).items():
                     content = (response.get("content") or {}).get("application/json")
                     if content and "schema" in content:
                         responses[status] = _pointer(
-                            "paths", template, method, "responses", status, "content", "application/json", "schema"
+                            "paths",
+                            template,
+                            method,
+                            "responses",
+                            status,
+                            "content",
+                            "application/json",
+                            "schema",
                         )
                 self.operations.append(
                     Operation(method.upper(), template, op.get("operationId", ""), regex, request, responses)
@@ -87,7 +96,9 @@ class SpecValidator:
 
     def _validator(self, pointer: str) -> Draft202012Validator:
         if pointer not in self._validators:
-            self._validators[pointer] = Draft202012Validator({"$ref": f"urn:lk#{pointer}"}, registry=self.registry)
+            self._validators[pointer] = Draft202012Validator(
+                {"$ref": f"urn:lk#{pointer}"}, registry=self.registry
+            )
         return self._validators[pointer]
 
     def errors(self, pointer: str, instance: Any) -> list[str]:

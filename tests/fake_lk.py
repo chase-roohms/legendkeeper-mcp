@@ -57,7 +57,9 @@ def gregorian() -> dict[str, Any]:
         "epochWeekday": 0,
         "hoursInDay": 24,
         "minutesInHour": 60,
-        "positiveEras": [{"id": "ad", "name": "Anno Domini", "abbr": "AD", "startsAt": 0, "resetMode": "none"}],
+        "positiveEras": [
+            {"id": "ad", "name": "Anno Domini", "abbr": "AD", "startsAt": 0, "resetMode": "none"}
+        ],
         "version": "1",
     }
 
@@ -169,9 +171,13 @@ class FakeLegendKeeper:
     def doc_of(self, rid: str, index: int = 0) -> dict[str, Any]:
         return self.documents[self.resources[rid]["docIds"][index]]
 
-    def fail(self, method: str, path_regex: str, status: int, code: str, *, headers: dict[str, str] | None = None) -> None:
+    def fail(
+        self, method: str, path_regex: str, status: int, code: str, *, headers: dict[str, str] | None = None
+    ) -> None:
         """Make the next matching request fail once."""
-        self.queued_errors.append((method, path_regex, ApiError(status, code, f"injected {code}"), headers or {}))
+        self.queued_errors.append(
+            (method, path_regex, ApiError(status, code, f"injected {code}"), headers or {})
+        )
 
     def calls(self, method: str | None = None, contains: str = "") -> list[Recorded]:
         return [r for r in self.requests if (method is None or r.method == method) and contains in r.path]
@@ -201,7 +207,20 @@ class FakeLegendKeeper:
             row["text"] = _plain(row.get("content") or [])
 
     def _listed(self, r: dict[str, Any]) -> dict[str, Any]:
-        out = {k: r.get(k) for k in ("id", "name", "parentId", "tags", "aliases", "rank", "isHidden", "createdAt", "updatedAt")}
+        out = {
+            k: r.get(k)
+            for k in (
+                "id",
+                "name",
+                "parentId",
+                "tags",
+                "aliases",
+                "rank",
+                "isHidden",
+                "createdAt",
+                "updatedAt",
+            )
+        }
         if r.get("iconGlyph"):
             out["iconGlyph"] = r["iconGlyph"]
         out["documents"] = [
@@ -212,7 +231,10 @@ class FakeLegendKeeper:
         return out
 
     def _document(self, d: dict[str, Any], *, full: bool = False) -> dict[str, Any]:
-        out = {k: d[k] for k in ("id", "name", "type", "rank", "isHidden", "isFullWidth", "createdAt", "updatedAt")}
+        out = {
+            k: d[k]
+            for k in ("id", "name", "type", "rank", "isHidden", "isFullWidth", "createdAt", "updatedAt")
+        }
         if d.get("calendarId"):
             out["calendarId"] = d["calendarId"]
         if full and d["type"] == "map":
@@ -223,7 +245,9 @@ class FakeLegendKeeper:
 
     def _resource(self, r: dict[str, Any]) -> dict[str, Any]:
         out = {k: v for k, v in r.items() if k not in ("docIds", "deleted") and v is not None}
-        out["documents"] = [self._document(self.documents[d]) for d in r["docIds"] if not self.documents[d]["deleted"]]
+        out["documents"] = [
+            self._document(self.documents[d]) for d in r["docIds"] if not self.documents[d]["deleted"]
+        ]
         out["properties"] = copy.deepcopy(self.properties.get(r["id"], []))
         return out
 
@@ -275,7 +299,10 @@ class FakeLegendKeeper:
             if request.method != "PUT" or key not in self.uploads:
                 return httpx.Response(403, text="bad upload")
             ticket = self.uploads[key]
-            if len(request.content) != ticket["contentLength"] or request.headers.get("content-type") != ticket["contentType"]:
+            if (
+                len(request.content) != ticket["contentLength"]
+                or request.headers.get("content-type") != ticket["contentType"]
+            ):
                 return httpx.Response(400, text="mismatch")
             ticket["stored"] = True
             return httpx.Response(200)
@@ -299,7 +326,9 @@ class FakeLegendKeeper:
         if self.validator is not None:
             op = self.validator.find(request.method, url.path)
             if op is None:
-                self.contract_errors.append(f"{request.method} {url.path} is not an operation in the OpenAPI spec")
+                self.contract_errors.append(
+                    f"{request.method} {url.path} is not an operation in the OpenAPI spec"
+                )
                 return self._error(ApiError(405, "METHOD_NOT_ALLOWED", "unknown route"))
             if op.request_pointer and body is not None:
                 problems = self.validator.errors(op.request_pointer, body)
@@ -323,7 +352,11 @@ class FakeLegendKeeper:
                 problems = self.validator.errors(pointer, payload)
                 if problems:
                     self.contract_errors.append(f"fake {op.operation_id} response invalid: {problems}")
-        response_headers = {"x-ratelimit-limit": "300", "x-ratelimit-remaining": "299", "x-ratelimit-reset": "0"}
+        response_headers = {
+            "x-ratelimit-limit": "300",
+            "x-ratelimit-remaining": "299",
+            "x-ratelimit-reset": "0",
+        }
         response_headers.update(extra)
         if payload is None:
             return httpx.Response(status, headers=response_headers)
@@ -338,7 +371,7 @@ class FakeLegendKeeper:
 
     # ------------------------------------------------------------------ routing
 
-    def _route(  # noqa: C901
+    def _route(
         self, method: str, path: str, params: dict[str, str], body: Any, headers: dict[str, str]
     ) -> tuple[int, Any, dict[str, str]]:
         if path == "/api/v3/projects" and method == "GET":
@@ -372,7 +405,15 @@ class FakeLegendKeeper:
         limit = int(params.get("limit", 50))
         page = items[:limit]
         more = len(items) > limit
-        return 200, {"data": [self._listed(r) for r in page], "hasMore": more, "nextCursor": page[-1]["id"] if more else None}, {}
+        return (
+            200,
+            {
+                "data": [self._listed(r) for r in page],
+                "hasMore": more,
+                "nextCursor": page[-1]["id"] if more else None,
+            },
+            {},
+        )
 
     def _create(self, body: dict[str, Any]) -> dict[str, Any]:
         if body.get("parentId") and body["parentId"] != "templates":
@@ -389,7 +430,9 @@ class FakeLegendKeeper:
         )  # fmt: skip
         self.documents[r["docIds"][0]]["name"] = docs[0].get("name") or "Main"
         for extra in docs[1:]:
-            self.add_document(r["id"], extra.get("name") or "Main", extra.get("type") or "blank", blocks=extra.get("blocks"))
+            self.add_document(
+                r["id"], extra.get("name") or "Main", extra.get("type") or "blank", blocks=extra.get("blocks")
+            )
         for key in ("iconGlyph", "iconColor", "iconShape", "isHidden", "isLocked", "banner"):
             if key in body:
                 r[key] = body[key]
@@ -403,7 +446,11 @@ class FakeLegendKeeper:
         return 201, {"resources": [self._resource(r) for r in created]}, {}
 
     def h_templates_get(self, **_: Any) -> Any:
-        items = [self._listed(r) for r in self.resources.values() if r.get("parentId") == "templates" and not r["deleted"]]
+        items = [
+            self._listed(r)
+            for r in self.resources.values()
+            if r.get("parentId") == "templates" and not r["deleted"]
+        ]
         return 200, {"data": items, "hasMore": False, "nextCursor": None}, {}
 
     def h_resources_from_template_post(self, *, body: dict[str, Any], **_: Any) -> Any:
@@ -432,7 +479,9 @@ class FakeLegendKeeper:
         while stack:
             item = stack.pop()
             item["deleted"] = True
-            stack.extend(c for c in self.resources.values() if c.get("parentId") == item["id"] and not c["deleted"])
+            stack.extend(
+                c for c in self.resources.values() if c.get("parentId") == item["id"] and not c["deleted"]
+            )
         return 204, None, {}
 
     def h_resources_x_restore_post(self, rid: str, **_: Any) -> Any:
@@ -495,7 +544,9 @@ class FakeLegendKeeper:
             raise ApiError(400, "KIND_MISMATCH", "not a page")
         return 200, self._blocks(d), {"etag": str(d["version"])}
 
-    def h_resources_x_docs_x_blocks_put(self, rid: str, did: str, *, body: dict[str, Any], headers: dict[str, str], **_: Any) -> Any:
+    def h_resources_x_docs_x_blocks_put(
+        self, rid: str, did: str, *, body: dict[str, Any], headers: dict[str, str], **_: Any
+    ) -> Any:
         d = self._doc(rid, did)
         self._page_doc(d)
         self._check_version(d, headers)
@@ -506,7 +557,9 @@ class FakeLegendKeeper:
         self._bump(d)
         return 200, self._blocks(d), {"etag": str(d["version"])}
 
-    def h_resources_x_docs_x_blocks_post(self, rid: str, did: str, *, body: dict[str, Any], headers: dict[str, str], **_: Any) -> Any:
+    def h_resources_x_docs_x_blocks_post(
+        self, rid: str, did: str, *, body: dict[str, Any], headers: dict[str, str], **_: Any
+    ) -> Any:
         d = self._doc(rid, did)
         self._page_doc(d)
         self._check_version(d, headers)
@@ -541,7 +594,9 @@ class FakeLegendKeeper:
                 return b
         raise ApiError(404, "NOT_FOUND", "block")
 
-    def h_resources_x_docs_x_blocks_x_properties_post(self, rid: str, did: str, bid: str, *, body: dict[str, Any], **_: Any) -> Any:
+    def h_resources_x_docs_x_blocks_x_properties_post(
+        self, rid: str, did: str, bid: str, *, body: dict[str, Any], **_: Any
+    ) -> Any:
         d = self._doc(rid, did)
         box = self._block(d, bid)
         if box.get("kind") != "infobox":
@@ -561,7 +616,9 @@ class FakeLegendKeeper:
                 return prop
         raise ApiError(404, "NOT_FOUND", "property")
 
-    def h_resources_x_docs_x_blocks_x_properties_x_rows_post(self, rid: str, did: str, bid: str, pid: str, *, body: dict[str, Any], **_: Any) -> Any:
+    def h_resources_x_docs_x_blocks_x_properties_x_rows_post(
+        self, rid: str, did: str, bid: str, pid: str, *, body: dict[str, Any], **_: Any
+    ) -> Any:
         d = self._doc(rid, did)
         prop = self._infobox_prop(d, bid, pid)
         row = self._new_row(body)
@@ -569,14 +626,18 @@ class FakeLegendKeeper:
         self._bump(d)
         return 201, {**row, "version": str(d["version"])}, {}
 
-    def h_resources_x_docs_x_blocks_x_properties_x_rows_x_patch(self, rid: str, did: str, bid: str, pid: str, row_id: str, *, body: dict[str, Any], **_: Any) -> Any:
+    def h_resources_x_docs_x_blocks_x_properties_x_rows_x_patch(
+        self, rid: str, did: str, bid: str, pid: str, row_id: str, *, body: dict[str, Any], **_: Any
+    ) -> Any:
         d = self._doc(rid, did)
         row = self._find_row(self._infobox_prop(d, bid, pid), row_id)
         self._patch_row(row, body)
         self._bump(d)
         return 200, {**row, "version": str(d["version"])}, {}
 
-    def h_resources_x_docs_x_blocks_x_properties_x_rows_x_delete(self, rid: str, did: str, bid: str, pid: str, row_id: str, **_: Any) -> Any:
+    def h_resources_x_docs_x_blocks_x_properties_x_rows_x_delete(
+        self, rid: str, did: str, bid: str, pid: str, row_id: str, **_: Any
+    ) -> Any:
         d = self._doc(rid, did)
         prop = self._infobox_prop(d, bid, pid)
         prop["rows"] = [r for r in prop["rows"] if r["id"] != row_id]
@@ -584,8 +645,18 @@ class FakeLegendKeeper:
         return 204, None, {}
 
     def _new_row(self, body: dict[str, Any]) -> dict[str, Any]:
-        content = body.get("content") if body.get("content") is not None else ([{"text": body["text"]}] if body.get("text") else [])
-        return {"id": new_id(), "rank": self.next_rank(), "key": body["key"], "content": content, "text": _plain(content)}
+        content = (
+            body.get("content")
+            if body.get("content") is not None
+            else ([{"text": body["text"]}] if body.get("text") else [])
+        )
+        return {
+            "id": new_id(),
+            "rank": self.next_rank(),
+            "key": body["key"],
+            "content": content,
+            "text": _plain(content),
+        }
 
     @staticmethod
     def _find_row(holder: dict[str, Any], row_id: str) -> dict[str, Any]:
@@ -626,12 +697,16 @@ class FakeLegendKeeper:
                 return prop
         raise ApiError(404, "NOT_FOUND", "property")
 
-    def h_resources_x_properties_x_rows_post(self, rid: str, pid: str, *, body: dict[str, Any], **_: Any) -> Any:
+    def h_resources_x_properties_x_rows_post(
+        self, rid: str, pid: str, *, body: dict[str, Any], **_: Any
+    ) -> Any:
         row = self._new_row(body)
         self._prop(rid, pid)["rows"].append(row)
         return 201, {**row, "version": "1"}, {}
 
-    def h_resources_x_properties_x_rows_x_patch(self, rid: str, pid: str, row_id: str, *, body: dict[str, Any], **_: Any) -> Any:
+    def h_resources_x_properties_x_rows_x_patch(
+        self, rid: str, pid: str, row_id: str, *, body: dict[str, Any], **_: Any
+    ) -> Any:
         row = self._find_row(self._prop(rid, pid), row_id)
         self._patch_row(row, body)
         return 200, {**row, "version": "1"}, {}
@@ -653,9 +728,15 @@ class FakeLegendKeeper:
 
     def h_resources_x_docs_x_features_get(self, rid: str, did: str, **_: Any) -> Any:
         d = self._doc(rid, did)
-        return 200, {"data": copy.deepcopy(list(d["features"].values())), "hasMore": False, "nextCursor": None}, {}
+        return (
+            200,
+            {"data": copy.deepcopy(list(d["features"].values())), "hasMore": False, "nextCursor": None},
+            {},
+        )
 
-    def h_resources_x_docs_x_features_post(self, rid: str, did: str, *, body: dict[str, Any], **_: Any) -> Any:
+    def h_resources_x_docs_x_features_post(
+        self, rid: str, did: str, *, body: dict[str, Any], **_: Any
+    ) -> Any:
         d = self._map_doc(rid, did)
         feature = {"id": body.get("id") or new_id(), "rank": self.next_rank(), **body}
         d["features"][feature["id"]] = feature
@@ -667,7 +748,9 @@ class FakeLegendKeeper:
             raise ApiError(404, "NOT_FOUND", "feature")
         return 200, copy.deepcopy(d["features"][fid]), {}
 
-    def h_resources_x_docs_x_features_x_patch(self, rid: str, did: str, fid: str, *, body: dict[str, Any], **_: Any) -> Any:
+    def h_resources_x_docs_x_features_x_patch(
+        self, rid: str, did: str, fid: str, *, body: dict[str, Any], **_: Any
+    ) -> Any:
         d = self._doc(rid, did)
         if fid not in d["features"]:
             raise ApiError(404, "NOT_FOUND", "feature")
@@ -692,7 +775,11 @@ class FakeLegendKeeper:
 
     def h_resources_x_docs_x_lanes_get(self, rid: str, did: str, **_: Any) -> Any:
         d = self._doc(rid, did)
-        return 200, {"data": copy.deepcopy(list(d["lanes"].values())), "hasMore": False, "nextCursor": None}, {}
+        return (
+            200,
+            {"data": copy.deepcopy(list(d["lanes"].values())), "hasMore": False, "nextCursor": None},
+            {},
+        )
 
     def h_resources_x_docs_x_lanes_post(self, rid: str, did: str, *, body: dict[str, Any], **_: Any) -> Any:
         d = self._time_doc(rid, did)
@@ -742,7 +829,9 @@ class FakeLegendKeeper:
         d["events"][event["id"]] = event
         return 201, self._event_out(event), {}
 
-    def h_resources_x_docs_x_events_x_patch(self, rid: str, did: str, eid: str, *, body: dict[str, Any], **_: Any) -> Any:
+    def h_resources_x_docs_x_events_x_patch(
+        self, rid: str, did: str, eid: str, *, body: dict[str, Any], **_: Any
+    ) -> Any:
         d = self._doc(rid, did)
         event = d["events"].get(eid)
         if event is None:
@@ -765,7 +854,15 @@ class FakeLegendKeeper:
     def h_resources_x_docs_x_board_get(self, rid: str, did: str, **_: Any) -> Any:
         d = self._doc(rid, did)
         board = d.get("board") or {"pages": [], "shapes": [], "bindings": [], "assets": []}
-        return 200, {"schema": {"schemaVersion": 2, "sequences": {}}, **copy.deepcopy(board), "version": str(d["version"])}, {}
+        return (
+            200,
+            {
+                "schema": {"schemaVersion": 2, "sequences": {}},
+                **copy.deepcopy(board),
+                "version": str(d["version"]),
+            },
+            {},
+        )
 
     # assets ----------------------------------------------------------------------------------
 
@@ -809,7 +906,14 @@ class FakeLegendKeeper:
         for r in self.resources.values():
             if r["deleted"] or not q:
                 continue
-            hit: dict[str, Any] = {"resource": {"id": r["id"], "name": r["name"], "tags": r["tags"], "parentId": r.get("parentId")}}
+            hit: dict[str, Any] = {
+                "resource": {
+                    "id": r["id"],
+                    "name": r["name"],
+                    "tags": r["tags"],
+                    "parentId": r.get("parentId"),
+                }
+            }
             if q in r["name"].casefold():
                 hits.append(hit)
                 continue
@@ -828,7 +932,13 @@ class FakeLegendKeeper:
         return 200, {"data": [gregorian()], "hasMore": False, "nextCursor": None}, {}
 
     def h_members_get(self, **_: Any) -> Any:
-        member = {"id": "user1", "name": "Finn", "email": "finn@example.com" if self.admin else None, "role": "OWNER", "image": None}
+        member = {
+            "id": "user1",
+            "name": "Finn",
+            "email": "finn@example.com" if self.admin else None,
+            "role": "OWNER",
+            "image": None,
+        }
         return 200, {"data": [member], "hasMore": False, "nextCursor": None}, {}
 
 

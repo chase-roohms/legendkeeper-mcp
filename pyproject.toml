@@ -45,6 +45,7 @@ dev = [
     "referencing>=0.35",
     "ruff>=0.6",
     "mypy>=1.11",
+    "hypothesis>=6.170.1",
 ]
 
 [build-system]
@@ -92,7 +93,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S", "B011"]
+"tests/**" = ["S", "B011", "PT018", "PT011", "C901", "RUF012"]
 
 [tool.mypy]
 python_version = "3.11"

@@ -15,6 +15,7 @@ complex tables and ``unsupported`` placeholders) is emitted either as
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Literal
@@ -162,6 +163,8 @@ def render_block(block: Block, ctx: RenderContext) -> str:
     if kind == "heading":
         level = min(6, max(1, int(block.get("level") or 1)))
         text = runs_to_markdown(block.get("content") or [], name_of=ctx.name_of).replace("\\\n", " ")
+        # A trailing run of "#" would be read as the heading's optional closing sequence.
+        text = re.sub(r"(^|[ \t])(#+)[ \t]*$", lambda m: m.group(1) + "\\" + m.group(2), text)
         return f"{'#' * level} {text}".rstrip()
     if kind == "code":
         text = str(block.get("text") or "")

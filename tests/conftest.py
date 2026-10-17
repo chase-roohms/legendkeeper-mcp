@@ -110,7 +110,11 @@ def fake(validator: SpecValidator | None) -> Any:
 
 @pytest.fixture
 def env() -> dict[str, str]:
-    return {"LEGENDKEEPER_API_KEY": API_KEY, "LEGENDKEEPER_BASE_URL": "https://lk.test", "LEGENDKEEPER_MAX_RETRIES": "1"}
+    return {
+        "LEGENDKEEPER_API_KEY": API_KEY,
+        "LEGENDKEEPER_BASE_URL": "https://lk.test",
+        "LEGENDKEEPER_MAX_RETRIES": "1",
+    }
 
 
 @pytest.fixture
