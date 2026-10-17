@@ -9,6 +9,8 @@ import os
 import sys
 from collections.abc import Sequence
 
+import httpx
+
 from . import __version__
 from .config import ConfigError, Settings
 from .errors import LegendKeeperMCPError
@@ -100,10 +102,10 @@ async def serve(settings: Settings) -> None:
         await registry.aclose()
 
 
-async def check(settings: Settings) -> int:
+async def check(settings: Settings, transport: httpx.AsyncBaseTransport | None = None) -> int:
     from .service import Registry
 
-    registry = Registry(settings)
+    registry = Registry(settings, transport=transport)
     failures = 0
     try:
         for name in registry.names:
