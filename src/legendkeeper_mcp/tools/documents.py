@@ -95,17 +95,24 @@ def register(t: ToolContext) -> None:
         section: Annotated[
             str | None, Field(description="Heading text for the *_section modes (case-insensitive).")
         ] = None,
+        expected_version: Annotated[
+            str | None,
+            Field(
+                description="The page version shown by read_document. When set, nothing is written if the page "
+                "changed since then. Strongly recommended with mode='replace' or 'replace_section'."
+            ),
+        ] = None,
         document: DocumentArg = None,
         project: ProjectArg = None,
     ) -> str:
         """Write Markdown to a page document. [[Name]] and [text](lk://resources/<id>) become mentions;
-        callouts, secrets, tables, task lists and images are supported. The write is atomic and checks the page
-        version, so concurrent edits are never overwritten silently."""
+        callouts, secrets, tables, task lists and images are supported. Writes are atomic; pass expected_version
+        (from read_document) so edits made in the app after you read the page are never overwritten."""
         session = registry.session(project)
         api = await session.api()
         rid = await session.resolve_resource(resource)
         doc = await pick_document(api, rid, document, ("page", "blank"))
-        outcome = await write_markdown(session, rid, doc, markdown, mode, section)
+        outcome = await write_markdown(session, rid, doc, markdown, mode, section, expected_version)
         lines = [
             f"Wrote '{doc.get('name')}' of {(await session.index()).name_of(rid) or rid} (mode {mode}): page now has "
             f"{outcome.blocks} top-level blocks, version {outcome.version}.",
@@ -135,14 +142,16 @@ def register(t: ToolContext) -> None:
         project: ProjectArg = None,
     ) -> str:
         """Add a document (tab) to a resource: a page, a map, a timeline or a board. A resource holds at most 5."""
+        if map_image_asset_id and type != "map":
+            raise InputError("map_image_asset_id only applies to map documents.")
+        if calendar_id and type != "time":
+            raise InputError("calendar_id only applies to timeline (time) documents.")
         session = registry.session(project)
         api = await session.api()
         rid = await session.resolve_resource(resource)
         body = compact({"name": name, "type": type, "calendarId": calendar_id, "isHidden": is_hidden or None})
         doc = await api.post("resources", rid, "docs", json=body)
         if map_image_asset_id:
-            if type != "map":
-                raise InputError("map_image_asset_id only applies to map documents.")
             doc = await api.patch(
                 "resources", rid, "docs", doc["id"], json={"mapImage": {"assetId": map_image_asset_id}}
             )

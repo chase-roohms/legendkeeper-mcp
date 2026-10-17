@@ -43,10 +43,18 @@ def materialize(
     ctx: RenderContext | None = None,
     *,
     reuse_unchanged: bool = True,
+    untouched: list[Block] | None = None,
 ) -> MaterializeResult:
+    """Resolve keep markers and reuse unchanged blocks.
+
+    ``existing`` is the part of the document being replaced; only its blocks can be kept or reused.
+    ``untouched`` is the rest of the document, which stays as it is: its ids are reserved so that nothing is
+    written twice.
+    """
     ctx = ctx or RenderContext()
     existing = existing or []
     by_id = {b["id"]: b for b in iter_blocks(existing) if b.get("id")}
+    reserved = {str(b["id"]) for b in iter_blocks(untouched or []) if b.get("id")}
     canonical: dict[str, list[Block]] = defaultdict(list)
     if reuse_unchanged:
         for block in existing:
@@ -54,12 +62,18 @@ def materialize(
                 canonical[render_top_block(block, ctx)].append(block)
 
     result = MaterializeResult(blocks=[])
-    used: set[str] = set()
+    used: set[str] = set(reserved)
 
     for block in parsed:
         if block.get("kind") == KEEP:
             block_id = str(block.get("id"))
             original = by_id.get(block_id)
+            if original is None and block_id in reserved:
+                result.warnings.append(
+                    f"lk:keep marker for block '{block_id}' refers to a block outside the part being written; "
+                    "that block stays where it is and the marker was ignored."
+                )
+                continue
             if original is None:
                 result.warnings.append(
                     f"lk:keep marker for block '{block_id}' does not match a block in this document; it was dropped."

@@ -394,3 +394,20 @@ def test_markdown_roundtrip_is_stable(md):
 @pytest.mark.parametrize("md", EXPRESSIBLE_DOCS)
 def test_expressible_documents_render_back_identically(md):
     assert roundtrip(md) == md
+
+
+@pytest.mark.parametrize(
+    "block",
+    [
+        {"kind": "quote", "children": [p({"text": "[!warning] beware"})]},
+        {
+            "kind": "bulletList",
+            "children": [{"kind": "listItem", "children": [p({"text": "[x] done thing"})]}],
+        },
+        {"kind": "bulletList", "children": [{"kind": "listItem", "children": [p({"text": "[ ] open"})]}]},
+        {"kind": "expand", "title": "*Secret* <tag> lore [x]", "children": [p({"text": "body"})]},
+        {"kind": "callout", "tone": "note", "children": [p({"text": "[!info] literal"})]},
+    ],
+)
+def test_literal_markers_survive_roundtrip(block):
+    assert parse(blocks_to_markdown([block])) == [block]

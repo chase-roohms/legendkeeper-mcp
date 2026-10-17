@@ -221,7 +221,8 @@ class _BlockParser:
             return None
         nodes = list(inline.children)
         first = nodes[0]
-        if first.type != "text" or not str(first.content).startswith("[!"):
+        # Check the raw source: an escaped "\\[!note]" is literal text, not a callout.
+        if first.type != "text" or not str(inline.content).startswith("[!"):
             return None
         split = next((i for i, n in enumerate(nodes) if n.type in ("softbreak", "hardbreak")), len(nodes))
         head_text = "".join(node_plain_text(n) for n in nodes[:split])
@@ -296,7 +297,7 @@ class _BlockParser:
         inline = _first_inline(item.children[0])
         if inline is None or not inline.children or inline.children[0].type != "text":
             return None
-        m = _TASK_RE.match(str(inline.children[0].content) + " ")
+        m = _TASK_RE.match(str(inline.content) + " ")  # raw source, so "\\[x\\]" stays literal
         return None if m is None else m.group(1) in ("x", "X")
 
     def task_list(self, items: list[SyntaxTreeNode]) -> Block:

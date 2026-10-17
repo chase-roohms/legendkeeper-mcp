@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -552,3 +553,95 @@ async def test_configured_project_id_skips_discovery(make_client, fake, project_
     async with make_client(LEGENDKEEPER_PROJECT_ID=project_id) as client:
         await call(client, "search", query="finn")
     assert all(r.path != "/api/v3/projects" for r in fake.requests)
+
+
+# ------------------------------------------------------------------------------------------ review regressions
+
+
+async def test_append_content_identical_to_existing_blocks(make_client, fake):
+    rid = fake.ids["candy"]
+    async with make_client() as client:
+        await call(
+            client, "write_page", resource=rid, mode="append", markdown="## Geography\n\nSweet hills.\n\n---"
+        )
+        await call(client, "write_page", resource=rid, mode="append", markdown="---")
+        await call(client, "write_page", resource=rid, mode="append_to_section", section="Geography",
+                   markdown="## History")  # fmt: skip
+        await call(client, "write_page", resource=rid, mode="prepend", markdown="## History")
+        await call(client, "write_page", resource=rid, mode="replace_section", section="History",
+                   markdown="Sweet hills.")  # fmt: skip
+    blocks = page_blocks(fake, rid)
+    ids = [b["id"] for b in blocks]
+    assert len(ids) == len(set(ids))
+
+
+async def test_keep_marker_outside_written_range_is_ignored(make_client, fake):
+    rid = fake.ids["candy"]
+    box = page_blocks(fake, rid)[0]["id"]
+    async with make_client() as client:
+        text = await call(client, "write_page", resource=rid, mode="append",
+                          markdown=f'<!-- lk:keep id="{box}" kind="infobox" -->\n\nMore.')  # fmt: skip
+        assert "outside the part being written" in text
+    assert [b["kind"] for b in page_blocks(fake, rid)].count("infobox") == 1
+
+
+async def test_replace_section_renames_heading(make_client, fake):
+    rid = fake.ids["candy"]
+    async with make_client() as client:
+        await call(client, "write_page", resource=rid, mode="replace_section", section="History",
+                   markdown="## Ancient History\n\nLong ago.")  # fmt: skip
+    titles = [b["content"][0]["text"] for b in page_blocks(fake, rid) if b["kind"] == "heading"]
+    assert titles == ["Ancient History", "Geography"]
+
+
+async def test_expected_version_prevents_lost_updates(make_client, fake):
+    async with make_client() as client:
+        page = await call(client, "read_document", resource="Finn")
+        version = re.search(r"version (\S+)", page).group(1)
+        fake.doc_of(fake.ids["finn"])["version"] += 1  # someone edits in the app
+        text = await call_error(client, "write_page", resource="Finn", mode="replace", markdown="Gone",
+                                expected_version=version)  # fmt: skip
+        assert "changed since version" in text
+        assert not fake.calls("PUT", "/blocks")
+        fake.fail("PUT", r"/blocks$", 412, "VERSION_MISMATCH")
+        current = str(fake.doc_of(fake.ids["finn"])["version"])
+        text = await call_error(client, "write_page", resource="Finn", mode="replace", markdown="Gone",
+                                expected_version=current)  # fmt: skip
+        assert "nothing was written" in text
+    assert page_blocks(fake, fake.ids["finn"])[0]["content"] == [{"text": "A brave hero."}]
+
+
+async def test_append_retry_after_ambiguous_success_does_not_duplicate(make_client, fake):
+    rid = fake.ids["finn"]
+
+    def apply_then_conflict(record):
+        # Simulate: the first PUT reached the server, but the client saw a timeout and its retry got 412.
+        if record.method == "PUT" and record.path.endswith("/blocks") and not getattr(fake, "_done", False):
+            fake._done = True
+            doc = fake.doc_of(rid)
+            doc["blocks"] = fake._with_ids(json.loads(json.dumps(record.body["blocks"])))
+            doc["version"] += 1
+            fake.fail("PUT", r"/blocks$", 412, "VERSION_MISMATCH")
+
+    fake.before_handle = apply_then_conflict
+    async with make_client() as client:
+        text = await call(client, "write_page", resource="Finn", mode="append", markdown="Appended once.")
+        assert "already present" in text
+    texts = [b["content"][0]["text"] for b in page_blocks(fake, rid)]
+    assert texts == ["A brave hero.", "Appended once."]
+
+
+async def test_move_resource_reorders_within_parent(make_client, fake):
+    async with make_client() as client:
+        await call(client, "move_resource", resource="Finn", before=fake.ids["pb"])
+        assert "parentId" not in fake.calls("POST", "/move")[-1].body
+        assert "Pass new_parent" in await call_error(client, "move_resource", resource="Finn")
+    assert fake.resources[fake.ids["finn"]]["parentId"] == fake.ids["characters"]
+
+
+async def test_create_document_validates_before_creating(make_client, fake):
+    async with make_client() as client:
+        text = await call_error(client, "create_document", resource="Finn", name="x", type="page",
+                                map_image_asset_id="a1")  # fmt: skip
+        assert "only applies to map" in text
+    assert not fake.calls("POST", "/docs")

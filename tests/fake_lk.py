@@ -497,7 +497,11 @@ class FakeLegendKeeper:
         r = self._res(rid)
         if body.get("parentId"):
             self._res(body["parentId"])
-        r["parentId"] = body.get("parentId")
+        parent = body["parentId"] if "parentId" in body else r.get("parentId")
+        for anchor in (body.get("before"), body.get("after")):
+            if anchor and self._res(anchor).get("parentId") != parent:
+                raise ApiError(400, "VALIDATION_ERROR", "anchor is not a child of the destination parent")
+        r["parentId"] = parent
         return 200, self._resource(r), {}
 
     # documents ---------------------------------------------------------------------------

@@ -20,7 +20,7 @@ from .markdown import (
     materialize,
     parse_markdown,
 )
-from .markdown.render import OpaqueMode
+from .markdown.render import OpaqueMode, render_top_block
 from .service import ProjectSession, ResourceIndex
 
 Block = dict[str, Any]
@@ -260,6 +260,7 @@ async def write_markdown(
     markdown: str,
     mode: WriteMode,
     section: str | None = None,
+    expected_version: str | None = None,
 ) -> WriteOutcome:
     api = await session.api()
     index = await session.index()
@@ -275,18 +276,38 @@ async def write_markdown(
 
     for attempt in range(2):
         current = await api.get("resources", resource_id, "docs", doc["id"], "blocks")
+        version = str(current.get("version")) if current.get("version") is not None else None
+        if expected_version is not None and attempt == 0 and version != expected_version:
+            raise _stale(expected_version, version)
         existing: list[Block] = list(current.get("blocks") or [])
-        mat = materialize(parsed.blocks, existing, render_ctx, reuse_unchanged=True)
-        final, note = _combine(existing, mat.blocks, mode, section)
+        plan = _plan(existing, mode, section)
+        mat = materialize(
+            parsed.blocks,
+            plan.replaced,
+            render_ctx,
+            reuse_unchanged=bool(plan.replaced),
+            untouched=plan.untouched,
+        )
+        if attempt == 1 and _already_applied(plan, mat.blocks, render_ctx):
+            # The first attempt reached the server even though it reported a conflict (e.g. a timeout retry).
+            return WriteOutcome(version=version, blocks=len(existing), warnings=parsed.warnings + mat.warnings,
+                                note="The change was already present on the page (an earlier attempt succeeded).")  # fmt: skip
+        final = _assemble(plan, mat.blocks)
         try:
             result = await api.put(
-                "resources", resource_id, "docs", doc["id"], "blocks",
+                "resources",
+                resource_id,
+                "docs",
+                doc["id"],
+                "blocks",
                 json={"blocks": final},
-                if_match=str(current.get("version")) if current.get("version") is not None else None,
-            )  # fmt: skip
+                if_match=version,
+            )
         except LegendKeeperError as exc:
-            if exc.code == "VERSION_MISMATCH" and attempt == 0:
+            if exc.code == "VERSION_MISMATCH" and attempt == 0 and expected_version is None:
                 continue
+            if exc.code == "VERSION_MISMATCH":
+                raise _stale(expected_version or version, None) from exc
             raise
         return WriteOutcome(
             version=(result or {}).get("version"),
@@ -295,41 +316,82 @@ async def write_markdown(
             kept=mat.kept,
             created=mat.created,
             warnings=parsed.warnings + mat.warnings,
-            note=note,
+            note=plan.note,
         )
     raise InputError("The page kept changing while writing; try again.")  # pragma: no cover
 
 
-def _combine(
-    existing: list[Block], new: list[Block], mode: WriteMode, section: str | None
-) -> tuple[list[Block], str]:
+def _stale(expected: str | None, current: str | None) -> InputError:
+    now = f" (now version {current})" if current else ""
+    return InputError(
+        f"The page changed since version {expected}{now}; nothing was written. Read it again with read_document "
+        "and redo the edit on the current content."
+    )
+
+
+@dataclass
+class _Plan:
+    before: list[Block]
+    replaced: list[Block]
+    after: list[Block]
+    note: str = ""
+    mode: str = ""
+
+    @property
+    def untouched(self) -> list[Block]:
+        return self.before + self.after
+
+
+def _plan(existing: list[Block], mode: WriteMode, section: str | None) -> _Plan:
+    """Split the page into the blocks before, being replaced by, and after the new content."""
     if mode == "replace":
-        return new, ""
+        return _Plan([], existing, [], mode=mode)
     if mode == "append":
-        return existing + new, ""
+        return _Plan(existing, [], [], mode=mode)
     if mode == "prepend":
-        return new + existing, ""
+        return _Plan([], [], existing, mode=mode)
     assert section is not None
     found = find_section(existing, section)
     if found is None:
-        heading: Block = {
-            "kind": "heading",
-            "level": 2,
-            "content": [{"text": section.strip().lstrip("#").strip()}],
-        }
-        starts_with_heading = bool(new) and new[0].get("kind") == "heading" and _same_title(new[0], section)
-        body = new if starts_with_heading else [heading, *new]
+        title = section.strip().lstrip("#").strip()
         available = ", ".join(f"'{t}'" for _, _, t in list_headings(existing)) or "none"
-        return (
-            existing + body,
-            f"Section '{section}' did not exist and was added at the end (headings: {available}).",
-        )
+        return _Plan(existing, [], [], f"Section '{section}' did not exist and was added at the end "
+                     f"(headings: {available}).", mode=f"new_section:{title}")  # fmt: skip
     if mode == "append_to_section":
-        return existing[: found.end] + new + existing[found.end :], ""
-    # replace_section: keep the heading unless the new Markdown brings its own.
-    if new and new[0].get("kind") == "heading" and _same_title(new[0], section):
-        return existing[: found.start] + new + existing[found.end :], ""
-    return existing[: found.start + 1] + new + existing[found.end :], ""
+        return _Plan(existing[: found.end], [], existing[found.end :], mode=mode)
+    return _Plan(existing[: found.start + 1], existing[found.start + 1 : found.end], existing[found.end :],
+                 mode=f"replace_section:{found.title}")  # fmt: skip
+
+
+def _assemble(plan: _Plan, body: list[Block]) -> list[Block]:
+    before = plan.before
+    starts_with_heading = bool(body) and body[0].get("kind") == "heading"
+    if plan.mode.startswith("new_section:"):
+        title = plan.mode.split(":", 1)[1]
+        if not (starts_with_heading and _same_title(body[0], title)):
+            body = [{"kind": "heading", "level": 2, "content": [{"text": title}]}, *body]
+    elif plan.mode.startswith("replace_section:") and starts_with_heading and before:
+        old = before[-1]
+        if _same_title(body[0], plan.mode.split(":", 1)[1]) or body[0].get("level") == old.get("level"):
+            before = before[:-1]  # the new Markdown brings (and may rename) the heading itself
+    return before + body + plan.after
+
+
+def _already_applied(plan: _Plan, new: list[Block], ctx: RenderContext) -> bool:
+    """After a conflict, check whether the page already holds exactly what this write would produce."""
+    if plan.mode != "replace" and not new:
+        return False
+
+    def same(a: list[Block], b: list[Block]) -> bool:
+        return [render_top_block(x, ctx) for x in a] == [render_top_block(x, ctx) for x in b]
+
+    if plan.mode == "append":
+        return len(plan.before) >= len(new) and same(plan.before[len(plan.before) - len(new) :], new)
+    if plan.mode == "prepend":
+        return same(plan.after[: len(new)], new)
+    if plan.mode == "append_to_section":
+        return len(plan.before) >= len(new) and same(plan.before[len(plan.before) - len(new) :], new)
+    return False
 
 
 def _same_title(block: Block, title: str) -> bool:

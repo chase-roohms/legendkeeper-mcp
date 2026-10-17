@@ -20,7 +20,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from .inline import mention_label, mention_uri, plain_text, runs_to_markdown
+from .inline import escape_text, mention_label, mention_uri, plain_text, runs_to_markdown
 
 Block = dict[str, Any]
 OpaqueMode = Literal["keep", "json"]
@@ -185,7 +185,7 @@ def render_block(block: Block, ctx: RenderContext) -> str:
         body = _render_children(block, ctx)
         return _prefix("[!secret]" + (f"\n{body}" if body else ""), "> ")
     if kind == "expand":
-        title = str(block.get("title") or "").replace("\n", " ")
+        title = escape_text(" ".join(str(block.get("title") or "").split()))
         body = _render_children(block, ctx)
         return _prefix(f"[!expand] {title}".rstrip() + (f"\n{body}" if body else ""), "> ")
     if kind in _LIST_KINDS:

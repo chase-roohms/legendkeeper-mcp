@@ -6,6 +6,7 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field
 
+from ..client import ProjectClient
 from ..documents import markdown_to_new_blocks
 from ..errors import InputError
 from ..service import TEMPLATES_ROOT
@@ -46,6 +47,22 @@ class NewResource(BaseModel):
     icon_glyph: str | None = Field(None, description="Font Awesome icon name, e.g. 'crown'.")
     icon_color: str | None = Field(None, pattern=r"^#[0-9A-Fa-f]{6}$")
     is_hidden: bool | None = None
+
+
+async def resolve_template(api: ProjectClient, ref: str) -> str:
+    """Templates may not appear in the resource list, so look them up through listTemplates."""
+    ref = ref.strip()
+    templates = await api.list_all("templates")
+    if any(t["id"] == ref for t in templates):
+        return ref
+    wanted = " ".join(ref.split()).casefold()
+    matches = [t for t in templates if " ".join(str(t.get("name", "")).split()).casefold() == wanted]
+    if len(matches) == 1:
+        return str(matches[0]["id"])
+    names = ", ".join(f"'{t.get('name')}' (id {t['id']})" for t in templates[:30]) or "none"
+    if matches:
+        raise InputError(f"Several templates are named '{ref}'; pass the id. Templates: {names}.")
+    raise InputError(f"No template '{ref}'. Templates: {names}.")
 
 
 def _summary(resource: dict[str, Any]) -> dict[str, Any]:
@@ -271,7 +288,8 @@ def register(t: ToolContext) -> None:
     async def move_resource(
         resource: ResourceArg,
         new_parent: Annotated[
-            str | None, Field(description="New parent id or name; 'root' (or omit) for the top level.")
+            str | None,
+            Field(description="New parent id or name, or 'root' for the top level. Omit to keep the parent."),
         ] = None,
         after: Annotated[str | None, Field(description="Place after this sibling id.")] = None,
         before: Annotated[str | None, Field(description="Place before this sibling id.")] = None,
@@ -283,8 +301,12 @@ def register(t: ToolContext) -> None:
         rid = await session.resolve_resource(resource)
         if after and before:
             raise InputError("Pass only one of after/before.")
-        body: dict[str, Any] = {"parentId": await parent_id(session, new_parent)}
-        body.update(compact({"after": after, "before": before}))
+        body: dict[str, Any] = compact({"after": after, "before": before})
+        if new_parent is not None:
+            # Omitting parentId keeps the current parent (reorder only); null means the root.
+            body["parentId"] = await parent_id(session, new_parent)
+        if not body:
+            raise InputError("Pass new_parent and/or after/before.")
         moved = await api.post("resources", rid, "move", json=body)
         session.invalidate()
         index = await session.index()
@@ -340,7 +362,7 @@ def register(t: ToolContext) -> None:
         """Create a resource from a template (copies its documents, properties, icon and tags)."""
         session = registry.session(project)
         api = await session.api()
-        template_id = await session.resolve_resource(template)
+        template_id = await resolve_template(api, template)
         body = compact(
             {
                 "templateId": template_id,
