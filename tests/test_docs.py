@@ -56,5 +56,7 @@ def test_server_json_matches_package():
     assert pypi["identifier"] == "legendkeeper-mcp" and pypi["version"] == __version__
     assert oci["identifier"].endswith(f":{__version__}")
     assert f"<!-- mcp-name: {name} -->" in README  # PyPI ownership proof
-    assert f'io.modelcontextprotocol.server.name="{name}"' in (ROOT / "Dockerfile").read_text(encoding="utf-8")
+    assert f'io.modelcontextprotocol.server.name="{name}"' in (ROOT / "Dockerfile").read_text(
+        encoding="utf-8"
+    )
     assert {"LEGENDKEEPER_API_KEY"} <= {e["name"] for e in pypi["environmentVariables"]}
