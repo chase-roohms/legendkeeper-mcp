@@ -7,7 +7,7 @@
 [![CI](https://github.com/chase-roohms/legendkeeper-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/chase-roohms/legendkeeper-mcp/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/legendkeeper-mcp)](https://pypi.org/project/legendkeeper-mcp/)
 [![Docker image](https://img.shields.io/badge/ghcr.io-legendkeeper--mcp-blue?logo=docker)](https://github.com/chase-roohms/legendkeeper-mcp/pkgs/container/legendkeeper-mcp)
-[![MCP Registry](https://img.shields.io/badge/MCP_Registry-io.github.chase--roohms%2Flegendkeeper--mcp-6B46C1)](https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.chase-roohms/legendkeeper-mcp)
+[![MCP Registry](https://img.shields.io/badge/MCP_Registry-io.github.chase--roohms%2Flegendkeeper--mcp-6B46C1)](https://registry.modelcontextprotocol.io/v0.1/servers/io.github.chase-roohms%2Flegendkeeper-mcp/versions/latest)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 An [MCP](https://modelcontextprotocol.io) server that lets AI assistants (Claude, Copilot, Cursor, …) read and
