@@ -93,7 +93,8 @@ async def test_full_write_cycle(tmp_path: Path) -> None:
 
 
 async def _write_cycle(client: Client, tmp_path: Path) -> None:
-    name = f"[mcp-test] {time.strftime('%Y-%m-%d %H:%M:%S')}"
+    run = f" ci-{os.environ['GITHUB_RUN_ID']}" if os.environ.get("GITHUB_RUN_ID") else ""
+    name = f"[mcp-test] {time.strftime('%Y-%m-%d %H:%M:%S')}{run}"
     created = json.loads(
         await call(
             client,

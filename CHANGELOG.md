@@ -6,6 +6,18 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- CI runs the live API test suite against a real project when the `LEGENDKEEPER_API_KEY` repository secret is
+  set (also weekly and before every release).
+
+### Fixed
+
+- `[[links]]` between items of one `create_resources` batch now resolve.
+- `read_document` prefers maps, timelines and boards over empty documents; `browse_tree` no longer shows `{blank}`.
+- `move_resource` and `create_resource` accept sibling names for `before`/`after`.
+- `upload_image` accepts Windows paths.
+
 ## [0.1.0] - 2026-10-16
 
 ### Added

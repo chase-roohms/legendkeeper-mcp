@@ -6,6 +6,9 @@ on:
   pull_request:
   workflow_dispatch:
   workflow_call:
+    secrets:
+      LEGENDKEEPER_API_KEY:
+        required: false
 
 permissions:
   contents: read
@@ -65,6 +68,41 @@ jobs:
         with:
           name: coverage
           path: coverage.xml
+
+  live:
+    name: Live API tests
+    # Runs against the real LegendKeeper project behind the LEGENDKEEPER_API_KEY secret. Secrets are not
+    # available to fork or Dependabot PRs; the job then skips itself.
+    needs: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: legendkeeper-live-api # one live run at a time (shared rate limits, shared world)
+      cancel-in-progress: false
+    env:
+      LEGENDKEEPER_API_KEY: ${{ secrets.LEGENDKEEPER_API_KEY }}
+      LEGENDKEEPER_LIVE_TESTS: "1"
+      LEGENDKEEPER_LIVE_WRITE: "1"
+    steps:
+      - name: Check for API key
+        id: key
+        run: |
+          if [ -n "$LEGENDKEEPER_API_KEY" ]; then echo "present=true" >> "$GITHUB_OUTPUT"
+          else echo "::notice::LEGENDKEEPER_API_KEY secret not available; skipping live tests."; fi
+      - uses: actions/checkout@v7
+        if: steps.key.outputs.present
+      - uses: astral-sh/setup-uv@v10.3.0
+        if: steps.key.outputs.present
+        with:
+          enable-cache: true
+      - if: steps.key.outputs.present
+        run: uv sync --locked
+      - name: Verify key
+        if: steps.key.outputs.present
+        run: uv run legendkeeper-mcp check
+      - name: Live tests (creates and deletes an "[mcp-test] …" sandbox resource)
+        if: steps.key.outputs.present
+        run: uv run pytest tests/test_live.py -v -m live -p no:cacheprovider
 
   build:
     name: Build distribution
