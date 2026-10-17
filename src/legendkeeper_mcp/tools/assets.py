@@ -52,7 +52,8 @@ def register(t: ToolContext) -> None:
                 raise InputError("Uploading from URLs is disabled (LEGENDKEEPER_ALLOW_URL_UPLOADS=false).")
             data = await client.fetch_bytes(source, settings.max_upload_bytes)
             return data, Path(unquote(parsed.path)).stem or "image"
-        if parsed.scheme not in ("", "file"):
+        # A one-letter "scheme" is a Windows drive letter (C:\...), i.e. a local path.
+        if parsed.scheme not in ("", "file") and len(parsed.scheme) != 1:
             raise InputError("`source` must be a local file path or an http(s) URL.")
         local = unquote(parsed.path) if parsed.scheme == "file" else source
         return await asyncio.to_thread(_read_local, local, settings.upload_root, settings.max_upload_bytes)

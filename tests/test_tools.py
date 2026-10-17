@@ -645,3 +645,12 @@ async def test_create_document_validates_before_creating(make_client, fake):
                                 map_image_asset_id="a1")  # fmt: skip
         assert "only applies to map" in text
     assert not fake.calls("POST", "/docs")
+
+
+async def test_upload_image_source_forms(make_client):
+    async with make_client() as client:
+        # Windows drive letters are paths, not URL schemes.
+        assert "File not found" in await call_error(client, "upload_image", source="C:\\no\\such\\image.png")
+        assert "local file path or an http(s) URL" in await call_error(
+            client, "upload_image", source="ftp://example.com/x.png"
+        )
