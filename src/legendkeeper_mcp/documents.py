@@ -246,9 +246,26 @@ def inline_context(index: ResourceIndex) -> InlineContext:
     return InlineContext(resolve_name=index.resolve_wiki, name_of=index.name_of)
 
 
-def markdown_to_new_blocks(markdown: str, index: ResourceIndex) -> tuple[list[Block], list[str]]:
-    """Markdown for a brand-new page (no existing blocks to keep or reuse)."""
-    parsed = parse_markdown(markdown, inline_context(index))
+def markdown_to_new_blocks(
+    markdown: str, index: ResourceIndex, extra_names: dict[str, tuple[str, str]] | None = None
+) -> tuple[list[Block], list[str]]:
+    """Markdown for a brand-new page (no existing blocks to keep or reuse).
+
+    ``extra_names`` maps case-folded names to ``(id, name)`` of resources that do not exist yet but will be
+    created in the same request (batch creation), so ``[[links]]`` to them resolve too.
+    """
+    ctx = inline_context(index)
+    if extra_names:
+
+        def resolve(name: str) -> tuple[str, str] | None:
+            return extra_names.get(" ".join(name.split()).casefold()) or index.resolve_wiki(name)
+
+        def name_of(resource_id: str) -> str | None:
+            found = next((n for rid, n in extra_names.values() if rid == resource_id), None)
+            return found or index.name_of(resource_id)
+
+        ctx = InlineContext(resolve_name=resolve, name_of=name_of)
+    parsed = parse_markdown(markdown, ctx)
     blocks, warnings = drop_keep_sentinels(parsed.blocks)
     return blocks, parsed.warnings + warnings
 

@@ -654,3 +654,30 @@ async def test_upload_image_source_forms(make_client):
         assert "local file path or an http(s) URL" in await call_error(
             client, "upload_image", source="ftp://example.com/x.png"
         )
+
+
+async def test_batch_links_resolve_to_items_in_the_same_batch(make_client, fake):
+    async with make_client() as client:
+        text = await call(
+            client, "create_resources",
+            resources=[
+                {"name": "Witch", "content": "Lives in [[Bog]] and fears [[the old one]]."},
+                {"name": "Bog"},
+                {"name": "Elder", "aliases": ["The Old One"]},
+            ],
+        )  # fmt: skip
+        assert "Warning" not in text
+    by_name = {r["name"]: r for r in fake.resources.values()}
+    runs = page_blocks(fake, by_name["Witch"]["id"])[0]["content"]
+    assert {"mention": {"resourceId": by_name["Bog"]["id"]}} in runs
+    assert {"mention": {"resourceId": by_name["Elder"]["id"], "text": "the old one"}} in runs
+
+
+async def test_read_document_prefers_typed_documents_over_blank(make_client, fake):
+    created = fake.add_resource("Era", doc_type="blank")
+    timeline = fake.add_document(created["id"], "Timeline", "time")
+    timeline["lanes"]["l1"] = {"id": "l1", "name": "Main", "rank": "a0", "size": "sm"}
+    async with make_client() as client:
+        text = await call(client, "read_document", resource="Era")
+        assert "type time" in text and "Lanes: 'Main'" in text
+        assert "{blank}" not in await call(client, "browse_tree")

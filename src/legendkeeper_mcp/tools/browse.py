@@ -23,8 +23,11 @@ def _tree_line(item: dict[str, Any], depth: int, index: ResourceIndex, show_docs
     more = f" (+{kids} children)" if kids else ""
     docs = ""
     if show_docs:
-        types = [str(d.get("type")) for d in item.get("documents") or []]
-        docs = f" {{{', '.join(types)}}}" if types and types != ["page"] else ""
+        # Only call out maps, timelines and boards; pages and empty (blank) documents are the norm.
+        types = [
+            str(d.get("type")) for d in item.get("documents") or [] if d.get("type") not in ("page", "blank")
+        ]
+        docs = f" {{{', '.join(types)}}}" if types else ""
     return f"{'  ' * depth}- {item.get('name')} (id {item['id']}){_icon(item)}{docs}{tags}{hidden}{more}"
 
 

@@ -60,11 +60,11 @@ def register(t: ToolContext) -> None:
     ) -> str:
         """Read a document of a resource. Pages come back as Markdown (with mentions as [Name](lk://resources/id)
         links); maps list their pins/regions/paths with coordinates; timelines list lanes and events; boards list
-        their text. Without `document`, the first page document (or the first document) is used."""
+        their text. Without `document`, the first page is used, else the first map, timeline or board."""
         session = registry.session(project)
         api = await session.api()
         rid = await session.resolve_resource(resource)
-        doc = await pick_document(api, rid, document, ("page", "blank", "map", "time", "board"))
+        doc = await pick_document(api, rid, document, ("page", "map", "time", "board", "blank"))
         index = await session.index()
         kind = doc.get("type")
         result: str | dict[str, Any]

@@ -27,3 +27,6 @@ secrets/
 # OS / editor
 .DS_Store
 .idea/
+
+# docker compose upload mount
+uploads/

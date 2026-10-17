@@ -164,8 +164,13 @@ def register(t: ToolContext) -> None:
         keys: dict[str, str] = {}
         payload: list[dict[str, Any]] = []
         warnings: list[str] = []
-        for i, item in enumerate(resources):
-            rid = new_id()
+        ids = [new_id() for _ in resources]
+        # [[Links]] may point at any item of the batch, including later ones (LegendKeeper accepts that).
+        batch_names: dict[str, tuple[str, str]] = {}
+        for rid, item in zip(ids, resources, strict=True):
+            for label in [item.name, *(item.aliases or [])]:
+                batch_names.setdefault(" ".join(label.split()).casefold(), (rid, item.name))
+        for i, (rid, item) in enumerate(zip(ids, resources, strict=True)):
             if item.key:
                 if item.key in keys:
                     raise InputError(f"Duplicate key '{item.key}' (item {i}).")
@@ -193,7 +198,7 @@ def register(t: ToolContext) -> None:
                 }
             )
             if item.content and item.content.strip():
-                blocks, item_warnings = markdown_to_new_blocks(item.content, index)
+                blocks, item_warnings = markdown_to_new_blocks(item.content, index, batch_names)
                 warnings.extend(f"{item.name}: {w}" for w in item_warnings)
                 body["documents"] = [{"type": "page", "name": "Main", "blocks": blocks}]
             payload.append(body)
