@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-10-16
+
 ### Added
 
 - Listing in the official MCP Registry as `io.github.chase-roohms/legendkeeper-mcp` (`server.json`, published by
@@ -39,6 +41,7 @@ All notable changes to this project are documented here. The format follows
 - stdio and bearer-token protected streamable HTTP transports; `legendkeeper-mcp check` command.
 - Docker image and compose file; GitHub Actions for CI, releases (PyPI + GHCR) and weekly API spec drift checks.
 
-[Unreleased]: https://github.com/chase-roohms/legendkeeper-mcp/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/chase-roohms/legendkeeper-mcp/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/chase-roohms/legendkeeper-mcp/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/chase-roohms/legendkeeper-mcp/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/chase-roohms/legendkeeper-mcp/releases/tag/v0.1.0

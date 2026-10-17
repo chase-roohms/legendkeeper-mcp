@@ -8,7 +8,7 @@
     "url": "https://github.com/chase-roohms/legendkeeper-mcp",
     "source": "github"
   },
-  "version": "0.1.1",
+  "version": "0.1.2",
   "icons": [
     {
       "src": "https://raw.githubusercontent.com/chase-roohms/legendkeeper-mcp/main/docs/icon.png",
@@ -23,7 +23,7 @@
       "registryType": "pypi",
       "registryBaseUrl": "https://pypi.org",
       "identifier": "legendkeeper-mcp",
-      "version": "0.1.1",
+      "version": "0.1.2",
       "runtimeHint": "uvx",
       "transport": {
         "type": "stdio"
@@ -47,7 +47,7 @@
     },
     {
       "registryType": "oci",
-      "identifier": "ghcr.io/chase-roohms/legendkeeper-mcp:0.1.1",
+      "identifier": "ghcr.io/chase-roohms/legendkeeper-mcp:0.1.2",
       "transport": {
         "type": "stdio"
       },
