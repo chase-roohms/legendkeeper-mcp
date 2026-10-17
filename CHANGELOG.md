@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-16
+
 ### Added
 
 - CI runs the live API test suite against a real project when the `LEGENDKEEPER_API_KEY` repository secret is
@@ -16,7 +18,6 @@ All notable changes to this project are documented here. The format follows
 - `[[links]]` between items of one `create_resources` batch now resolve.
 - `read_document` prefers maps, timelines and boards over empty documents; `browse_tree` no longer shows `{blank}`.
 - `move_resource` and `create_resource` accept sibling names for `before`/`after`.
-- `upload_image` accepts Windows paths.
 
 ## [0.1.0] - 2026-10-16
 
@@ -32,5 +33,6 @@ All notable changes to this project are documented here. The format follows
 - stdio and bearer-token protected streamable HTTP transports; `legendkeeper-mcp check` command.
 - Docker image and compose file; GitHub Actions for CI, releases (PyPI + GHCR) and weekly API spec drift checks.
 
-[Unreleased]: https://github.com/chase-roohms/legendkeeper-mcp/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/chase-roohms/legendkeeper-mcp/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/chase-roohms/legendkeeper-mcp/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/chase-roohms/legendkeeper-mcp/releases/tag/v0.1.0
