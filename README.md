@@ -1,0 +1,1 @@
+# legendkeeper-mcp
