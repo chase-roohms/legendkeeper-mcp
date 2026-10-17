@@ -112,7 +112,7 @@ def register(t: ToolContext) -> None:
         icon_shape: IconShape | None = None,
         is_hidden: Annotated[bool | None, Field(description="Create hidden (ADMIN keys only).")] = None,
         after: Annotated[
-            str | None, Field(description="Sibling resource id to place this one after.")
+            str | None, Field(description="Sibling (id or name) to place this one after.")
         ] = None,
         project: ProjectArg = None,
     ) -> str:
@@ -130,7 +130,7 @@ def register(t: ToolContext) -> None:
                 "iconColor": icon_color,
                 "iconShape": icon_shape,
                 "isHidden": is_hidden,
-                "after": after,
+                "after": await session.resolve_resource(after) if after else None,
             }
         )
         warnings: list[str] = []
@@ -296,8 +296,8 @@ def register(t: ToolContext) -> None:
             str | None,
             Field(description="New parent id or name, or 'root' for the top level. Omit to keep the parent."),
         ] = None,
-        after: Annotated[str | None, Field(description="Place after this sibling id.")] = None,
-        before: Annotated[str | None, Field(description="Place before this sibling id.")] = None,
+        after: Annotated[str | None, Field(description="Place after this sibling (id or name).")] = None,
+        before: Annotated[str | None, Field(description="Place before this sibling (id or name).")] = None,
         project: ProjectArg = None,
     ) -> str:
         """Move a resource (and its children) to another parent and/or position among its siblings."""
@@ -306,7 +306,12 @@ def register(t: ToolContext) -> None:
         rid = await session.resolve_resource(resource)
         if after and before:
             raise InputError("Pass only one of after/before.")
-        body: dict[str, Any] = compact({"after": after, "before": before})
+        body: dict[str, Any] = compact(
+            {
+                "after": await session.resolve_resource(after) if after else None,
+                "before": await session.resolve_resource(before) if before else None,
+            }
+        )
         if new_parent is not None:
             # Omitting parentId keeps the current parent (reorder only); null means the root.
             body["parentId"] = await parent_id(session, new_parent)

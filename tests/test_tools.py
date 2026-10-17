@@ -681,3 +681,9 @@ async def test_read_document_prefers_typed_documents_over_blank(make_client, fak
         text = await call(client, "read_document", resource="Era")
         assert "type time" in text and "Lanes: 'Main'" in text
         assert "{blank}" not in await call(client, "browse_tree")
+
+
+async def test_move_resource_accepts_sibling_names(make_client, fake):
+    async with make_client() as client:
+        await call(client, "move_resource", resource="Princess Bubblegum", before="Finn")
+    assert fake.calls("POST", "/move")[-1].body == {"before": fake.ids["finn"]}
