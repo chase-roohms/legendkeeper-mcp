@@ -44,3 +44,17 @@ def test_versions_agree():
     pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
     assert f'version = "{__version__}"' in pyproject
     assert f"## [{__version__}]" in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+
+
+def test_server_json_matches_package():
+    server = json.loads((ROOT / "server.json").read_text(encoding="utf-8"))
+    name = server["name"]
+    assert len(server["description"]) <= 100  # registry limit
+    assert server["version"] == __version__
+    pypi = next(p for p in server["packages"] if p["registryType"] == "pypi")
+    oci = next(p for p in server["packages"] if p["registryType"] == "oci")
+    assert pypi["identifier"] == "legendkeeper-mcp" and pypi["version"] == __version__
+    assert oci["identifier"].endswith(f":{__version__}")
+    assert f"<!-- mcp-name: {name} -->" in README  # PyPI ownership proof
+    assert f'io.modelcontextprotocol.server.name="{name}"' in (ROOT / "Dockerfile").read_text(encoding="utf-8")
+    assert {"LEGENDKEEPER_API_KEY"} <= {e["name"] for e in pypi["environmentVariables"]}

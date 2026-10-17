@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Listing in the official MCP Registry as `io.github.chase-roohms/legendkeeper-mcp` (`server.json`, published by
+  the release workflow).
+- Project artwork: `docs/social-preview.png` (GitHub social preview, README banner) and `docs/icon.png`.
+
 ## [0.1.1] - 2026-10-16
 
 ### Added

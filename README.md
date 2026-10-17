@@ -1,8 +1,13 @@
 # legendkeeper-mcp
 
+<!-- mcp-name: io.github.chase-roohms/legendkeeper-mcp -->
+
+![legendkeeper-mcp: let AI assistants read and build your LegendKeeper worlds](https://raw.githubusercontent.com/chase-roohms/legendkeeper-mcp/main/docs/social-preview.png)
+
 [![CI](https://github.com/chase-roohms/legendkeeper-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/chase-roohms/legendkeeper-mcp/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/legendkeeper-mcp)](https://pypi.org/project/legendkeeper-mcp/)
 [![Docker image](https://img.shields.io/badge/ghcr.io-legendkeeper--mcp-blue?logo=docker)](https://github.com/chase-roohms/legendkeeper-mcp/pkgs/container/legendkeeper-mcp)
+[![MCP Registry](https://img.shields.io/badge/MCP_Registry-io.github.chase--roohms%2Flegendkeeper--mcp-6B46C1)](https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.chase-roohms/legendkeeper-mcp)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 An [MCP](https://modelcontextprotocol.io) server that lets AI assistants (Claude, Copilot, Cursor, …) read and
@@ -311,14 +316,18 @@ src/legendkeeper_mcp/
 CI runs on every push and PR: lint, mypy, tests on Linux/macOS/Windows (Python 3.11-3.13), a wheel build, and
 a Docker build with stdio/HTTP smoke tests.
 
-To release, bump `version` in `pyproject.toml` and `src/legendkeeper_mcp/__init__.py`, update
-[CHANGELOG.md](CHANGELOG.md), commit, then `git tag v0.2.0 && git push --tags`. The
+To release, bump `version` in `pyproject.toml`, `src/legendkeeper_mcp/__init__.py` and `server.json` (the server
+and package versions plus the image tag), update [CHANGELOG.md](CHANGELOG.md), commit, then `git tag v0.2.0 && git push --tags`. The
 [release workflow](.github/workflows/release.yml) then:
 
 1. verifies the tag matches the package version and reruns CI,
 2. publishes to PyPI using [trusted publishing](https://docs.pypi.org/trusted-publishers/),
 3. pushes a multi-arch (amd64/arm64) image with SBOM and provenance to `ghcr.io/<owner>/legendkeeper-mcp`,
-4. creates a GitHub release with the built distributions.
+4. creates a GitHub release with the built distributions,
+5. publishes [`server.json`](server.json) to the [official MCP Registry](https://registry.modelcontextprotocol.io)
+   as `io.github.chase-roohms/legendkeeper-mcp` (GitHub OIDC login, no secret needed). The registry checks
+   ownership through the `mcp-name` comment at the top of this README, which PyPI shows as the package
+   description, and the `io.modelcontextprotocol.server.name` label on the Docker image.
 
 One-time setup: on PyPI, add a *pending trusted publisher* for project `legendkeeper-mcp` → this repository,
 workflow `release.yml`, environment `pypi`, and create a `pypi` environment in the repository settings. GHCR needs

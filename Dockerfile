@@ -23,7 +23,8 @@ LABEL org.opencontainers.image.title="legendkeeper-mcp" \
       org.opencontainers.image.description="Unofficial MCP server for the LegendKeeper worldbuilding API" \
       org.opencontainers.image.source="https://github.com/chase-roohms/legendkeeper-mcp" \
       org.opencontainers.image.licenses="MIT" \
-      org.opencontainers.image.version="${VERSION}"
+      org.opencontainers.image.version="${VERSION}" \
+      io.modelcontextprotocol.server.name="io.github.chase-roohms/legendkeeper-mcp"
 RUN useradd --create-home --uid 10001 --shell /usr/sbin/nologin legendkeeper \
     && mkdir -p /uploads && chown legendkeeper /uploads
 COPY --from=build /app/.venv /app/.venv
