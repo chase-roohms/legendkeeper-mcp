@@ -223,6 +223,9 @@ class FakeLegendKeeper:
         }
         if r.get("iconGlyph"):
             out["iconGlyph"] = r["iconGlyph"]
+        out["hasChildren"] = any(
+            child["parentId"] == r["id"] and not child["deleted"] for child in self.resources.values()
+        )
         out["documents"] = [
             {"id": d, "name": self.documents[d]["name"], "type": self.documents[d]["type"]}
             for d in r["docIds"]
@@ -387,7 +390,7 @@ class FakeLegendKeeper:
             raise ApiError(403, "WRONG_PROJECT", "wrong project")
         parts = [p for p in path[len(prefix) :].split("/") if p]
         if not parts:
-            return 200, self._project(), {}
+            return 200, {**self._project(), "homeResourceId": None}, {}
         handler_name = "h_" + "_".join(p.replace("-", "_") if p in _LITERALS else "x" for p in parts)
         handler_name += "_" + method.lower()
         handler = getattr(self, handler_name, None)
@@ -397,7 +400,15 @@ class FakeLegendKeeper:
         return handler(*ids, params=params, body=body, headers=headers)
 
     def _project(self) -> dict[str, Any]:
-        return {"id": self.project_id, "name": self.project_name, "isPublic": False, "createdAt": NOW}
+        return {
+            "id": self.project_id,
+            "name": self.project_name,
+            "isPublic": False,
+            "createdAt": NOW,
+            "coverImageUrl": None,
+            "coverGradient": None,
+            "lastActivityAt": NOW,
+        }
 
     # resources ---------------------------------------------------------------------------
 
@@ -469,7 +480,16 @@ class FakeLegendKeeper:
         return 201, self._resource(r), {}
 
     def h_resources_x_get(self, rid: str, **_: Any) -> Any:
-        return 200, self._resource(self._res(rid)), {}
+        resource = self._res(rid)
+        ancestors = []
+        seen = {rid}
+        parent = self.resources.get(resource["parentId"])
+        while parent is not None and not parent["deleted"] and parent["id"] not in seen:
+            ancestors.append({"id": parent["id"], "name": parent["name"]})
+            seen.add(parent["id"])
+            parent = self.resources.get(parent["parentId"])
+        ancestors.reverse()
+        return 200, {**self._resource(resource), "ancestors": ancestors}, {}
 
     def h_resources_x_patch(self, rid: str, *, body: dict[str, Any], **_: Any) -> Any:
         r = self._res(rid)
@@ -539,7 +559,7 @@ class FakeLegendKeeper:
                 raise ApiError(400, "VALIDATION_ERROR", "unknown asset")
             w, h = asset["width"], asset["height"]
             d["mapImage"] = {"assetId": asset["id"], "url": asset["url"], "width": w, "height": h,
-                             "bounds": [[-h / 8, 0], [0, w / 8]]}  # fmt: skip
+                             "bounds": [[-h / 8, 0], [0, w / 8]], "tiles": None}  # fmt: skip
         return 200, self._document(d, full=True), {}
 
     def h_resources_x_docs_x_delete(self, rid: str, did: str, **_: Any) -> Any:
