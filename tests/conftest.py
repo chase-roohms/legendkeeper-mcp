@@ -66,7 +66,7 @@ def seed(fake: FakeLegendKeeper) -> dict[str, str]:
     map_doc = fake.doc_of(world_map["id"])
     map_doc["mapImage"] = {
         "assetId": None, "url": "https://assets.legendkeeper.test/map.png", "width": 2048, "height": 1024,
-        "bounds": [[-128, 0], [0, 256]],
+        "bounds": [[-128, 0], [0, 256]], "tiles": None,
     }  # fmt: skip
     map_doc["features"]["pinaaaa1"] = {
         "id": "pinaaaa1", "type": "pin", "name": "Candy Castle", "pos": [-10, 20], "rank": "a0",
