@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10.3.0
+      - uses: astral-sh/setup-uv@v10.3.1
         with:
           enable-cache: true
       - run: uv sync --locked
@@ -49,7 +49,7 @@ jobs:
       LK_REQUIRE_SPEC: ${{ matrix.os == 'ubuntu-latest' && '1' || '' }}
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10.3.0
+      - uses: astral-sh/setup-uv@v10.3.1
         with:
           enable-cache: true
           python-version: ${{ matrix.python }}
@@ -91,7 +91,7 @@ jobs:
           else echo "::notice::LEGENDKEEPER_API_KEY secret not available; skipping live tests."; fi
       - uses: actions/checkout@v7
         if: steps.key.outputs.present
-      - uses: astral-sh/setup-uv@v10.3.0
+      - uses: astral-sh/setup-uv@v10.3.1
         if: steps.key.outputs.present
         with:
           enable-cache: true
@@ -109,7 +109,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10.3.0
+      - uses: astral-sh/setup-uv@v10.3.1
       - run: uv build
       - run: uvx twine check --strict dist/*
       - name: Smoke-test the wheel
